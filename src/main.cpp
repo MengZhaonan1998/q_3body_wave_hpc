@@ -9,7 +9,10 @@ int main()
 
   double *Dn = new double[(N+1)*(N+1)];
 
-  ChebyshevDiffMatrix2(N, Dn);
+  ChebyshevDiffMatrix2(N, 1, Dn);
+
+  SparseMatrix *pot;
+  pot = buildGaussianPotential2B1D(N, 1, 1);
 
   MatrixShow(N+1,N+1,(N+1)*(N+1),Dn);
  
