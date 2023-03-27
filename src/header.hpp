@@ -17,4 +17,5 @@ SparseMatrix *buildGaussianPotential2B1D(int n, double L, double v0);
 double *buildDenseHamiltonian2B1D(int n, double L, SparseMatrix *Vsp);
 
 
-
+// delete
+void DeleteSparseMatrix(SparseMatrix *Sp);
