@@ -4,10 +4,6 @@
 #include <iostream>
 
 
-// note: you may add any number of tests to verify
-// your code behaves correctly, but do not change
-// the existing tests.
-
 TEST(stencil, bounds_check)
 {
   stencil3d S;
@@ -22,6 +18,7 @@ TEST(stencil, bounds_check)
   EXPECT_THROW(S.index_c(0,0,S.nz), std::runtime_error);
 }
 
+
 TEST(stencil, index_order_kji)
 {
   stencil3d S;
@@ -35,6 +32,7 @@ TEST(stencil, index_order_kji)
   EXPECT_EQ(S.index_c(i,j,k), S.index_c(i,j-1,k)+S.nx);
   EXPECT_EQ(S.index_c(i,j,k), S.index_c(i,j,k-1)+S.nx*S.ny);
 }
+
 
 TEST(operations, init)
 {
@@ -90,5 +88,32 @@ TEST(operations, axpby)
   for (int i=0; i<n; i++) err = std::max(err, std::abs(y[i]-double(n)));
   EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());
 }
+
+
+TEST(operations, tensor_apply)
+{
+  // test for tensor operator reshape(a2*C2*W+a1*W*C1^T,N1*N2,1)+V*w
+  double C1[4]={1,2,1,3};            // C1
+  double C2[9]={2,2,3,2,2,4,2,2,5};  // C2
+  double V[6]={1,2,3,6,3,2};   // Potential matrix/or vector
+
+  double v_in[6]={1,2,1,3,0,4};
+  double v_out[6];
+   
+  QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
+  Koperator.apply(v_in, v_out);
+  
+  double result[6] = {17, 16, 23, 46, 24, 47}; 
+
+  double err=0.0;
+  for (int i=0; i<6; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
+  EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
+}
+
+
+
+
+
+
 
 

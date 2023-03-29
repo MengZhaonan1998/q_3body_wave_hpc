@@ -40,12 +40,15 @@ int main(int argc, char* argv[])
   results->cvg_hist = (double*)malloc(maxiter * sizeof(double));
 
 
-  double* D1;  // Chebyshev diff mat x
-  double* D2;  // Chebyshev diff mat y
-  double* V;   // Potential matrix/or vector
+  double D1[4]={1,2,3,4};  // Chebyshev diff mat x
+  double D2[9]={1,1,1,3,4,5,7,7,8};  // Chebyshev diff mat y
+  double V[6]={1,2,3,6,3,2};   // Potential matrix/or vector
 
-  QRes::Kron2D<double> Koperator(1, D1, 1, D2, V, 1.0, 1.0);
-  Koperator.apply();
+  double v_in[6]={1,1,1,1,1,1};
+  double v_out[6];
+   
+  QRes::Kron2D<double> Koperator(2, D1, 3, D2, V, 1.0, 1.0);
+  Koperator.apply(v_in, v_out);
 
   std::cout << "finish!\n" << std::endl;
  
