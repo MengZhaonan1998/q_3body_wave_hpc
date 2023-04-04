@@ -1,3 +1,4 @@
+#pragma once 
 
 typedef struct r_resultJD {
   double *eigval;
@@ -6,6 +7,9 @@ typedef struct r_resultJD {
 } resultJD;
 
 void ChebyshevDiffMatrix(int n, double L, double *ChebD1);
+void ChebyshevDiffMatrix2(int n, double L, double *ChebD2);
+double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23); 
+
 
 //resultJD quadJacobiDavidson(int i);
 
