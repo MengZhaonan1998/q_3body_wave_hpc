@@ -5,6 +5,8 @@ typedef struct r_resultJD {
   double *cvg_hist;
 } resultJD;
 
+void ChebyshevDiffMatrix(int n, double L, double *ChebD1);
+
 //resultJD quadJacobiDavidson(int i);
 
 
