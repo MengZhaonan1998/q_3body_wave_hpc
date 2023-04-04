@@ -1,3 +1,4 @@
+#include "header.hpp"
 #include "gtest_mpi.hpp"
 #include "operations.hpp"
 #include "tensor3b1d.hpp"
@@ -109,6 +110,67 @@ TEST(operations, tensor_apply)
   for (int i=0; i<6; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
   EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
 }
+
+
+TEST(buildoperator, chebyshevDiffMat)
+{
+  int n =5;
+  double L=1.0;
+  
+ // double ChebMat[(n+1)*(n+1)];
+  double* ChebMat = (double*)malloc((n+1)*(n+1)*sizeof(double));
+  ChebyshevDiffMatrix(n, L, ChebMat); // first order chebyshev differentiation matrix
+
+  double true_chebmat[(n+1)*(n+1)] = 
+   {8.5000,  -10.4721,    2.8944,   -1.5279,    1.1056,   -0.5000,
+    2.6180,   -1.1708,   -2.0000,    0.8944,   -0.6180,    0.2764,
+   -0.7236,    2.0000,   -0.1708,   -1.6180,    0.8944,   -0.3820,
+    0.3820,   -0.8944,    1.6180,    0.1708,   -2.0000,    0.7236,
+   -0.2764,    0.6180,   -0.8944,    2.0000,    1.1708,   -2.6180,
+    0.5000,   -1.1056,    1.5279,   -2.8944,   10.4721,   -8.5000}; // true chebyshev diff matrix
+
+  double err = 0.0;
+  for (int i=0; i<(n+1)*(n+1); i++)
+      err = std::max(err, std::max(err, std::abs(true_chebmat[i]-ChebMat[i])));
+
+  EXPECT_NEAR(1.0+err, 1.0, 0.0001);  
+  free(ChebMat);
+}
+
+
+TEST(buildoperator, chebyshevDiffMat2)
+{
+  int n =5;
+  double L=1.0;
+  
+  // double ChebMat[(n+1)*(n+1)];
+  double* ChebMat2 = (double*)malloc((n+1)*(n+1)*sizeof(double));
+  ChebyshevDiffMatrix2(n, L, ChebMat2); // second order chebyshev differentiation matrix
+
+  double true_chebmat2[(n+1)*(n+1)] = 
+  {41.6000,  -68.3607,   40.8276,  -23.6393,   17.5724,   -8.0000,
+   21.2859,  -31.5331,   12.6833,   -3.6944,    2.2111,   -0.9528,
+   -1.8472,    7.3167,  -10.0669,    5.7889,   -1.9056,    0.7141,
+    0.7141,   -1.9056,    5.7889,  -10.0669,    7.3167,   -1.8472,
+   -0.9528,    2.2111,   -3.6944,   12.6833,  -31.5331,   21.2859,
+   -8.0000,   17.5724,  -23.6393,   40.8276,  -68.3607,   41.6000};
+
+  double err = 0.0;
+  for (int i=0; i<(n+1)*(n+1); i++)
+      err = std::max(err, std::max(err, std::abs(true_chebmat2[i]-ChebMat2[i])));
+
+  EXPECT_NEAR(1.0+err, 1.0, 0.0001);  
+  free(ChebMat2);
+}
+
+
+
+
+
+
+
+
+
 
 
 
