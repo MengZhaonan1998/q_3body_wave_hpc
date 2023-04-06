@@ -84,7 +84,7 @@ double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double 
   for (i=0; i<=nR; i++) xChebR[i] = LR*cos(M_PI * i / nR); 
   for (j=0; j<=nr; j++) xChebr[j] = Lr*cos(M_PI * j / nr);
 
-  double* VGauss = new double[(nR+1)*(nr+1)];
+  double* VGauss = (double*)malloc((nR+1)*(nr+1)*sizeof(double));
 
   for (i=0; i<=nR; i++)
     for (j=0; j<=nr; j++)
