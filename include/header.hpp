@@ -1,4 +1,13 @@
 #pragma once 
+#include <cstdlib>
+#include <memory>
+#include <string>
+#include <map>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <complex>
 
 typedef struct r_resultJD {
   double *eigval;
@@ -6,9 +15,11 @@ typedef struct r_resultJD {
   double *cvg_hist;
 } resultJD;
 
+std::map<std::string, std::string> readJDopts();
 void ChebyshevDiffMatrix(int n, double L, double *ChebD1);
 void ChebyshevDiffMatrix2(int n, double L, double *ChebD2);
 double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23); 
+std::unique_ptr<resultJD> JacobiDavidson(int proc_numb, int proc_rank, std::map<std::string,std::string> jdopts);
 
 
 //resultJD quadJacobiDavidson(int i);
