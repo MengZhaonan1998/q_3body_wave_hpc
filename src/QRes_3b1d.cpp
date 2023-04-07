@@ -49,12 +49,6 @@ int main(int argc, char* argv[])
   double LR = atoi(argv[3]);
   double Lr = atoi(argv[4]);
 
-  int proc_rank;               // processor rank
-  int proc_numb;               // number of processors
-  MPI_Init(&argc, &argv);      // initialize mpi
-  MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank); // get processor rank
-  MPI_Comm_size(MPI_COMM_WORLD, &proc_numb); // get processor number
-
   //--- read options of Jacobi-Davidson algorithm ---//
   auto jdopts = readJDopts(); 
   std::cout << "Options of the JD algorithm are as follows:" << std::endl;
@@ -62,8 +56,10 @@ int main(int argc, char* argv[])
 	  std::cout<< key << "=" << value << std::endl;
 
   //--- Jacobi-Davidson eigensolver ---//
-  auto result = JacobiDavidson(proc_numb, proc_rank, jdopts); 
-
+  MPI_Init(&argc, &argv);                  // initialize mpi
+  auto result = JacobiDavidson(nR, nr, LR, Lr, jdopts);    // quadratic jacobi-davidson algorithm
+  MPI_Finalize();                          // finish mpi
+  
   //--- display the result including eigenvalues... ---//
   std::cout << "Eigenvalues detected:" << std::endl;
   for (int i=0; i<stoi(jdopts["numeigs"]); i++) std::cout<<result->eigval[i]<<std::endl;
@@ -106,8 +102,6 @@ int main(int argc, char* argv[])
   free(D2_R);
   free(D2_r);
   */
-  
 
-  MPI_Finalize();
   return 0;
 }
