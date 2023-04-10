@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.16.0)
 project(QRes)
 
 include_directories(include)
-add_executable(QRes_3b1d src/QRes_3b1d.cpp src/timer.cpp src/buildMatrix.cpp src/JacobiDavidson.cpp)
-add_executable(run_tests src/run_tests.cpp src/test_operations.cpp src/operations.cpp src/gtest_mpi.cpp src/buildMatrix.cpp)
+add_executable(QRes_3b1d src/QRes_3b1d.cpp src/timer.cpp src/buildMatrix.cpp src/JacobiDavidson.cpp src/modifiedGS.cpp src/operations.cpp)
+add_executable(run_tests src/run_tests.cpp src/test_operations.cpp src/operations.cpp src/gtest_mpi.cpp src/buildMatrix.cpp src/modifiedGS.cpp)
 
 target_include_directories(QRes_3b1d PUBLIC include/)
 target_include_directories(run_tests PUBLIC include/)

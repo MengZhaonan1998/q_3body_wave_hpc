@@ -10,6 +10,7 @@
 #include <vector>
 #include <complex>
 #include <cmath>
+#include <omp.h>
 
 typedef struct r_resultJD {
   std::complex<double> *eigval;
@@ -22,6 +23,7 @@ void ChebyshevDiffMatrix(int n, double L, double *ChebD1);
 void ChebyshevDiffMatrix2(int n, double L, double *ChebD2);
 double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23); 
 std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::map<std::string,std::string> jdopts);
+void modifiedGS(std::complex<double>* V, int m, int n);
 
 
 //resultJD quadJacobiDavidson(int i);
