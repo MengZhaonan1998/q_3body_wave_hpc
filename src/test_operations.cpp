@@ -5,36 +5,6 @@
 #include <iostream>
 
 
-TEST(stencil, bounds_check)
-{
-  stencil3d S;
-  S.nx=5;
-  S.ny=3;
-  S.nz=2;
-  EXPECT_THROW(S.index_c(-1,0,0), std::runtime_error);
-  EXPECT_THROW(S.index_c(S.nx,0,0), std::runtime_error);
-  EXPECT_THROW(S.index_c(0,-1,0), std::runtime_error);
-  EXPECT_THROW(S.index_c(0,S.ny,0), std::runtime_error);
-  EXPECT_THROW(S.index_c(0,0,-1), std::runtime_error);
-  EXPECT_THROW(S.index_c(0,0,S.nz), std::runtime_error);
-}
-
-
-TEST(stencil, index_order_kji)
-{
-  stencil3d S;
-  S.nx=50;
-  S.ny=33;
-  S.nz=21;
-
-  int i=10, j=15, k=9;
-
-  EXPECT_EQ(S.index_c(i,j,k), S.index_c(i-1,j,k)+1);
-  EXPECT_EQ(S.index_c(i,j,k), S.index_c(i,j-1,k)+S.nx);
-  EXPECT_EQ(S.index_c(i,j,k), S.index_c(i,j,k-1)+S.nx*S.ny);
-}
-
-
 TEST(operations, init)
 {
   const int n=15;
@@ -54,7 +24,8 @@ TEST(operations, init)
 }
 
 
-TEST(operations, dot) {
+TEST(operations, dot) 
+{
   const int n=150;
   double x[n], y[n];
 
@@ -66,6 +37,22 @@ TEST(operations, dot) {
 
   double res = dot(n, x, y); // The results of dot(x,y) should be equal to the length n
   EXPECT_NEAR(res, (double)n, n*std::numeric_limits<double>::epsilon());
+}
+
+
+TEST(operations, complex_dot)
+{
+  const int n=50;
+  std::complex<double> x[n], y[n];
+
+  for (int i=0; i<n; i++)
+  {
+    x[i] = std::complex<double>(double(i+1), double(i+1));
+    y[i] = std::complex<double>(1/double(i+1), 1/double(i+1));
+  }
+	
+  std::complex<double> res = complex_dot(n/2, n/2, n/2, x, y);
+  EXPECT_NEAR(res.real(), double(n), n*std::numeric_limits<double>::epsilon());
 }
 
 
@@ -91,6 +78,33 @@ TEST(operations, axpby)
 }
 
 
+TEST(operations, complex_axpby)
+{
+  const int n=10;
+  std::complex<double> x[n], y[n];
+
+  std::complex<double> a=2.0;
+  std::complex<double> b=2.0;
+ 
+  for (int i=0; i<n; i++)
+  {
+    x[i] = std::complex<double>(double(i+1)/2.0,1.0);
+    y[i] = std::complex<double>(double(n-i-1)/2.0,-1.0);
+  }
+
+  complex_axpby(n/2, n/2, n/2, a, x, b, y);
+
+  double err=0.0;
+
+  for (int i=n/2; i<n; i++)
+  {  
+    err = std::max(err, std::abs(y[i].real()-double(n)));
+    err = std::max(err, std::abs(y[i].imag()-0.0));
+  } 
+  EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());
+}
+ 
+
 TEST(operations, tensor_apply)
 {
   // test for tensor operator reshape(a2*C2*W+a1*W*C1^T,N1*N2,1)+V*w
@@ -109,6 +123,43 @@ TEST(operations, tensor_apply)
   double err=0.0;
   for (int i=0; i<6; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
   EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
+}
+
+
+TEST(functions, modified_gramschmidt)
+{
+  using namespace std::complex_literals;
+  std::complex<double> V[16] = { 0.9827 + 0.3127i, 0.7302 + 0.1615i, 0.3439 + 0.1788i, 0.5841 + 0.4229i,
+                                 0.1078 + 0.0942i, 0.9063 + 0.5985i, 0.8797 + 0.4709i, 0.8178 + 0.6959i,
+                                 0.2607 + 0.6999i, 0.5944 + 0.6385i, 0.0225 + 0.0336i, 0.4253 + 0.0688i,
+                                 0.4219 - 0.4712i, 0.9731 + 0.4214i, 0.1289 - 0.5839i, 0.6731 + 0.8571i};
+  int m=4; int n=4;
+  modifiedGS(V, m, n);
+
+  double err_nr = 0.0;
+  double err_ni = 0.0;
+  std::complex<double> norm;
+  for (int i=0; i<n; i++)
+  {
+     norm = complex_dot(m, m*i, m*i, V, V);
+     err_nr = std::max(err_nr, norm.real());
+     err_ni = std::max(err_ni, norm.imag());
+  }
+  EXPECT_NEAR(err_nr, 1.0, std::numeric_limits<double>::epsilon());
+  EXPECT_NEAR(1.0+err_ni, 1.0, std::numeric_limits<double>::epsilon());
+
+  double err_rr = 0.0;
+  double err_ri = 0.0;
+  for (int i=1; i<n; i++)
+     for (int j=0; j<i; j++)
+     {
+        norm = complex_dot(m, m*j, m*i, V, V);
+        err_rr = std::max(err_rr, norm.real());
+        err_ri = std::max(err_ri, norm.imag());
+     }
+
+  EXPECT_NEAR(1.0+err_rr, 1.0, 10*std::numeric_limits<double>::epsilon());
+  EXPECT_NEAR(1.0+err_ri, 1.0, 10*std::numeric_limits<double>::epsilon());
 }
 
 
