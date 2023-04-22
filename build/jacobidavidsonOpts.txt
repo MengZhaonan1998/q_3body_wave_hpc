@@ -5,6 +5,7 @@ mindim:10
 maxdim:25
 tolerance:1e-5
 maxiter:100
+verbose:1
 lsolver:gmres
 precond:lu
 
