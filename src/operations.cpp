@@ -12,6 +12,17 @@ void init(int n, double* x, double value)
 }
 
 
+void complex_init(int n, std::complex<double>* x, std::complex<double> value)
+{
+ 
+  #pragma omp parallel for 
+  for (int i=0; i<n; i++)
+     x[i] = value;   // assign value to every entry of x
+  
+  return;
+}
+
+
 double dot(int n, double const* x, double const* y)
 {
   double res=0.0;
@@ -24,13 +35,13 @@ double dot(int n, double const* x, double const* y)
 }
 
 
-std::complex<double> complex_dot(int n, int startx, int starty, std::complex<double> const* x, std::complex<double> const* y)
+std::complex<double> complex_dot(int n, std::complex<double> const* x, std::complex<double> const* y)
 {
   std::complex<double> res(0.0,0.0);
   
  // #pragma omp parallel for reduction(+:res)
   for (int i=0; i<n; i++)
-     res += std::conj(x[i+startx]) * y[i+starty];
+     res += std::conj(x[i]) * y[i];
 
   return res;
 }
