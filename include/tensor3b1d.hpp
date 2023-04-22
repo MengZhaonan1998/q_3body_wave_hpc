@@ -8,7 +8,7 @@ namespace QRes
     public:
       Kron2D(int m, ST* C_m, 
 	     int n, ST* D_n,
-	     ST* V, ST a1, ST a2):
+	     ST* V, double a1, double a2):
              C_(C_m), D_(D_n), V_(V), a1_(a1), a2_(a2), n_(n), m_(m){};
 
       // reshape operator

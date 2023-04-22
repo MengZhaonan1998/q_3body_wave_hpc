@@ -21,7 +21,11 @@ typedef struct r_resultJD {
 std::map<std::string, std::string> readJDopts();
 void ChebyshevDiffMatrix(int n, double L, double *ChebD1);
 void ChebyshevDiffMatrix2(int n, double L, double *ChebD2);
-double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23); 
+void buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23, std::complex<double>* VGauss); 
+void buildKmatrix(int n, double L, std::complex<double> *K);
+void buildCmatrix(int n, std::complex<double>* C);
+void buildMmatrix(int n, std::complex<double>* M);
+
 std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::map<std::string,std::string> jdopts);
 void modifiedGS(std::complex<double>* V, int m, int n);
 
