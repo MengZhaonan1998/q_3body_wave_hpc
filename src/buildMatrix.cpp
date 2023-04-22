@@ -2,7 +2,7 @@
 
 #include <cmath>
 #include "header.hpp"
-
+#include "operations.hpp"
 
 void ChebyshevDiffMatrix(int n, double L, double *ChebD1){
    // Chebyshev differentiation matrix D_N
@@ -73,7 +73,7 @@ void ChebyshevDiffMatrix2(int n, double L, double *ChebD2){
 }
 
 
-double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23 ){
+void buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23, std::complex<double>* VGauss){
   // array of Gaussian potential of 3body 1d problem
   // R->i r->j
 
@@ -83,8 +83,6 @@ double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double 
   double* xChebr = new double[nr+1];
   for (i=0; i<=nR; i++) xChebR[i] = LR*cos(M_PI * i / nR); 
   for (j=0; j<=nr; j++) xChebr[j] = Lr*cos(M_PI * j / nr);
-
-  double* VGauss = (double*)malloc((nR+1)*(nr+1)*sizeof(double));
 
   for (i=0; i<=nR; i++)
     for (j=0; j<=nr; j++)
@@ -97,12 +95,61 @@ double* buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double 
 
   delete [] xChebR;
   delete [] xChebr;
-
-  return VGauss;
+  return;
 }
 
 
+void buildKmatrix(int n, double L, std::complex<double> *K)
+{
+   double* D = new double[(n+1)*(n+1)];
+   double* D2 = new double[(n+1)*(n+1)];
+   ChebyshevDiffMatrix(n, L, D);
+   ChebyshevDiffMatrix2(n, L, D2);
 
+   for (int i=0; i<=n; i++) 
+   {
+      K[i] = D[i];
+      K[(n+1)*n+i] = -D[(n+1)*n+i];
+   }
+
+   for (int i=n+1; i<(n+1)*n; i++)
+      K[i] = -0.5 * D2[i];
+   
+   delete [] D;
+   delete [] D2;
+   return;
+}
+
+
+void buildCmatrix(int n, std::complex<double>* C)
+{
+   // Note that C matrix is very sparse
+   // but here we still store it as a dense matrix
+   // We will improve this later
+
+   for (int i=0; i<(n+1)*(n+1); i++)
+      C[i]=std::complex<double>(0.0,0.0);
+   C[0] = std::complex<double>(0.0,1.0);
+   C[(n+1)*(n+1)-1] = std::complex<double>(0.0,1.0);
+
+   return;
+}
+
+
+void buildMmatrix(int n, std::complex<double>* M)
+{
+   // Note that M matrix is very sparse
+   // but here we still store it as a dense matrix
+   // We will improve this later
+
+   for (int i=0; i<(n+1)*(n+1); i++)
+      M[i]=0.0;
+
+   for (int i=1; i<n; i++)
+      M[i*(n+1)+i]=-0.5;
+
+   return;
+}
 
 /*
 SparseMatrix *buildGaussianPotential2B1D(int n, double L, double v0){
