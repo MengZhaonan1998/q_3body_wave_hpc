@@ -51,7 +51,7 @@ TEST(operations, complex_dot)
     y[i] = std::complex<double>(1/double(i+1), 1/double(i+1));
   }
 	
-  std::complex<double> res = complex_dot(n/2, n/2, n/2, x, y);
+  std::complex<double> res = complex_dot(n/2, x+n/2, y+n/2);
   EXPECT_NEAR(res.real(), double(n), n*std::numeric_limits<double>::epsilon());
 }
 
@@ -141,7 +141,7 @@ TEST(functions, modified_gramschmidt)
   std::complex<double> norm;
   for (int i=0; i<n; i++)
   {
-     norm = complex_dot(m, m*i, m*i, V, V);
+     norm = complex_dot(m, V+m*i, V+m*i);
      err_nr = std::max(err_nr, norm.real());
      err_ni = std::max(err_ni, norm.imag());
   }
@@ -153,7 +153,7 @@ TEST(functions, modified_gramschmidt)
   for (int i=1; i<n; i++)
      for (int j=0; j<i; j++)
      {
-        norm = complex_dot(m, m*j, m*i, V, V);
+        norm = complex_dot(m, V+m*j, V+m*i);
         err_rr = std::max(err_rr, norm.real());
         err_ri = std::max(err_ri, norm.imag());
      }
@@ -215,11 +215,30 @@ TEST(buildoperator, chebyshevDiffMat2)
 }
 
 
+TEST(buildoperator, Kmatrix)
+{
+  int n =5;
+  double L=1.0;
+  
+  // double ChebMat[(n+1)*(n+1)];
+  std::complex<double>* K = (std::complex<double>*)malloc((n+1)*(n+1)*sizeof(std::complex<double>));
+  buildKmatrix(n, L, K);
 
+  double true_K[(n+1)*(n+1)] =
+  {8.5000,  -10.4721,  2.8944,  -1.5279,  1.1056,  -0.5000,
+  -10.6430,  15.7666, -6.3416,   1.8472, -1.1056,   0.4764,
+   0.9236,   -3.6584,  5.0334,  -2.8944,  0.9528,  -0.3570,
+  -0.3570,    0.9528, -2.8944,   5.0334, -3.6584,   0.9236,
+  0.4764,   -1.1056,  1.8472,  -6.3416,  15.7666, -10.6430,
+  -0.5000,    1.1056, -1.5279,   2.8944, -10.4721,  8.5000};
+  
+   double err = 0.0;
+  for (int i=0; i<(n+1)*(n+1); i++)
+      err = std::max(err, std::max(err, std::abs(K[i]-true_K[i])));
 
-
-
-
+  EXPECT_NEAR(1.0+err, 1.0, 0.0001);  
+  free(K);
+}
 
 
 
