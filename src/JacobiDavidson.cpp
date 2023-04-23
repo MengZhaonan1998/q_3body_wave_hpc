@@ -58,22 +58,50 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
   std::complex<double>* V = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N*maxdim);
   complex_init(N, V, 1.0/std::sqrt(N)); // initialize and normalize the first column of search space V
   
-  
   int iter = 0;     // iteration number
   int detected = 0; // number of eigenpairs found
+  int Vdim = 1;     // dimension of the search space V
   
   //--- start Jacobi-Davidson iteration ---//
   while(true)
   {
     /* Parallelization MPI+OpenMP 
      * Rayleigh Ritz projection
-     * tips: tall skinny matrix ... */
-    
-     
-    /* Linearization
+     * tips: tall skinny matrix ... 
+     *      + 
+     * Linearization
      * solve the linear eigenvalue problem by LAPACK
      * */
+    std::complex<double>* Amat = (std::complex<double>*)malloc(sizeof(std::complex<double>)*4*Vdim);
+    std::complex<double>* Bmat = (std::complex<double>*)malloc(sizeof(std::complex<double>)*4*Vdim);
+    
+    for (int i=0; i<Vdim; i++)
+       for (int j=0; j<Vdim; j++)
+       {
+          Amat[i*2*Vdim+j] = 1.0;     // todo
+	  Amat[i*2*Vdim+Vdim+j] = 0.0;// todo
 
+	  
+          Amat[(i+Vdim)*2*Vdim+j] = (i==j) ? -1.0:0.0;
+	  Amat[(i+Vdim)*2*Vdim+j+Vdim]=0.0;
+
+	  Bmat[i*2*Vdim+j] = 3.0;    // todo 
+          Bmat[i*2*Vdim+Vdim+j] = 0.0;
+	  Bmat[(i+Vdim)*2*Vdim+j]=0.0; 
+          Bmat[(i+Vdim)*2*Vdim+j+Vdim] = (i==j) ? -1.0:0.0;
+
+       }
+
+
+
+    for (int i=0; i<2*Vdim; i++){
+       for (int j=0; j<2*Vdim; j++)
+       {   std::cout << Bmat[i*2*Vdim+j] << "  ";}
+       std::cout << "\n";
+    }
+
+    free(Amat);
+    free(Bmat);
 
     break;
   }
