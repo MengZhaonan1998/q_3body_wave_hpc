@@ -11,6 +11,7 @@
 #include <complex>
 #include <cmath>
 #include <omp.h>
+#include <Eigen/Eigenvalues>
 
 typedef struct r_resultJD {
   std::complex<double> *eigval;
