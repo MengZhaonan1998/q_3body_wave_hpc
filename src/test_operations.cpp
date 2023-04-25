@@ -92,7 +92,7 @@ TEST(operations, complex_axpby)
     y[i] = std::complex<double>(double(n-i-1)/2.0,-1.0);
   }
 
-  complex_axpby(n/2, n/2, n/2, a, x, b, y);
+  complex_axpby(n/2, a, x+n/2, b, y+n/2);
 
   double err=0.0;
 

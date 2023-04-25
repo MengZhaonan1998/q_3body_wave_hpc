@@ -12,11 +12,11 @@ void modifiedGS(std::complex<double>* V, int m, int n)
   {
     norm = complex_dot(m, V+j*m, V+j*m); 
     norm = sqrt(norm);
-    complex_0xpby(m, j*m, std::complex<double>(1.0,0.0)/norm, V);
+    complex_0xpby(m, std::complex<double>(1.0,0.0)/norm, V+j*m);
     for (k=j+1; k<n; k++)
     {
        vdot = complex_dot(m, V+j*m, V+k*m);
-       complex_axpby(m, j*m, k*m, -vdot, V, std::complex<double>(1.0,0.0), V);
+       complex_axpby(m, -vdot, V+j*m, std::complex<double>(1.0,0.0), V+k*m);
     }
   }
 }

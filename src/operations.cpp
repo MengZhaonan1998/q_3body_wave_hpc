@@ -56,17 +56,17 @@ void axpby(int n, double a, double const* x, double b, double* y)
 }
 
 
-void complex_axpby(int n, int startx, int starty, std::complex<double> a, std::complex<double>* x, std::complex<double> b, std::complex<double>* y)
+void complex_axpby(int n, std::complex<double> a, std::complex<double>* x, std::complex<double> b, std::complex<double>* y)
 {
   for (int i=0; i<n; i++)
-     y[i+starty] = (a * x[i+startx] + b * y[i+starty]);
+     y[i] = (a * x[i] + b * y[i]);
   return;
 }
 
 
-void complex_0xpby(int n, int start, std::complex<double> b, std::complex<double>* y)
+void complex_0xpby(int n, std::complex<double> b, std::complex<double>* y)
 {
-  for (int i=start; i<n+start; i++)
+  for (int i=0; i<n; i++)
      y[i] = b * y[i];
   return;
 }
