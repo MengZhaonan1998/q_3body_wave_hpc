@@ -23,9 +23,9 @@ std::complex<double> complex_dot(int n, std::complex<double> const* x, std::comp
 void axpby(int n, double a, double const* x, double b, double* y);
 
 // complex vector update: compute y[i] = a*x[i] + b*y[i] for 0<=i<n
-void complex_axpby(int n, int startx, int starty, std::complex<double> a, std::complex<double>* x, std::complex<double> b, std::complex<double>* y);
+void complex_axpby(int n, std::complex<double> a, std::complex<double>* x, std::complex<double> b, std::complex<double>* y);
 
 // complex vector update: compute y[i] = b*y[i] for 0<=i<n
-void complex_0xpby(int n, int start, std::complex<double> b, std::complex<double>* y);
+void complex_0xpby(int n, std::complex<double> b, std::complex<double>* y);
 
 
