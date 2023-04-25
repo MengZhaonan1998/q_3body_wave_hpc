@@ -4,6 +4,8 @@
 #include "header.hpp"
 #include "operations.hpp"
 
+#include <iostream>
+
 void ChebyshevDiffMatrix(int n, double L, double *ChebD1){
    // Chebyshev differentiation matrix D_N
    //  n -- number of grid points (The true number of grid points is n+1 due to the nature of Chebyshev-Gauss-Labatto points)
@@ -73,7 +75,8 @@ void ChebyshevDiffMatrix2(int n, double L, double *ChebD2){
 }
 
 
-void buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23, std::complex<double>* VGauss){
+void buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12, double V13, double V23, std::complex<double>* VGauss)
+{
   // array of Gaussian potential of 3body 1d problem
   // R->i r->j
 
@@ -88,7 +91,7 @@ void buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12
     for (j=0; j<=nr; j++)
     {
       val_a = pow(xChebR[i],2);
-      val_b = 0.25 * pow(xChebR[i],2) + pow(xChebr[i],2) + xChebR[i]*xChebr[j];
+      val_b = 0.25 * pow(xChebR[i],2) + pow(xChebr[j],2) + xChebR[i]*xChebr[j];
       val_c = 0.25 * pow(xChebR[i],2) + pow(xChebr[j],2) - xChebR[i]*xChebr[j];
       VGauss[i*(nr+1)+j] = -(V12*exp(-val_a) + V13*exp(-val_b) + V23*exp(-val_c));  
     }
@@ -129,8 +132,8 @@ void buildCmatrix(int n, std::complex<double>* C)
 
    for (int i=0; i<(n+1)*(n+1); i++)
       C[i]=std::complex<double>(0.0,0.0);
-   C[0] = std::complex<double>(0.0,1.0);
-   C[(n+1)*(n+1)-1] = std::complex<double>(0.0,1.0);
+   C[0] = std::complex<double>(1.0,0.0);
+   C[(n+1)*(n+1)-1] = std::complex<double>(1.0,0.0);
 
    return;
 }
