@@ -41,14 +41,15 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
   std::complex<double>* a0 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nr+1));
 
   buildKmatrix(nR, LR, KR);   // K matrix (nR coordinate)
-  buildCmatrix(nR, CR);       // C matrix (nR coordinate)
+  buildCmatrix(nR, CR);       // C matrix (nR coordinate)  A problem about C matrix.. complex number? Check!
   buildMmatrix(nR, MR);       // M matrix (nR coordinate)
   buildKmatrix(nr, Lr, Kr);   // K matrix (nr coordinate)
   buildCmatrix(nr, Cr);       // C matrix (nr coordinate)
   buildMmatrix(nr, Mr);       // M matrix (nr coordinate)
 
-  buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);
-  complex_init((nR+1)*(nr+1), a0, 0.0+0.0i);
+  //complex_init(N, Vp, 0.0+0.0i);
+  buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // (already checked)
+  complex_init(N, a0, 0.0);
 
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0);
   QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0);	   
@@ -56,6 +57,10 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
 	   
   // search space V (stored by column major!)
   std::complex<double>* V = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N*maxdim);
+  std::complex<double>* Kv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
+  std::complex<double>* Cv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
+  std::complex<double>* Mv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
+
   complex_init(N, V, 1.0/std::sqrt(N)); // initialize and normalize the first column of search space V
   
   int iter = 0;     // iteration number
@@ -70,38 +75,56 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
      * tips: tall skinny matrix ... 
      *      + 
      * Linearization
-     * solve the linear eigenvalue problem by LAPACK
-     * */
-    std::complex<double>* Amat = (std::complex<double>*)malloc(sizeof(std::complex<double>)*4*Vdim);
-    std::complex<double>* Bmat = (std::complex<double>*)malloc(sizeof(std::complex<double>)*4*Vdim);
-    
+     * solve the linear eigenvalue problem by LAPACK*/
+    Eigen::MatrixXcd Amat = Eigen::MatrixXcd(2*Vdim,2*Vdim); 
+    Eigen::MatrixXcd Kmat = Eigen::MatrixXcd(Vdim,Vdim);
+    Eigen::MatrixXcd Cmat = Eigen::MatrixXcd(Vdim,Vdim);
+    Eigen::MatrixXcd Mmat = Eigen::MatrixXcd(Vdim,Vdim);
+
     for (int i=0; i<Vdim; i++)
        for (int j=0; j<Vdim; j++)
        {
-          Amat[i*2*Vdim+j] = 1.0;     // todo
-	  Amat[i*2*Vdim+Vdim+j] = 0.0;// todo
+          Koperator.apply(V+j*N, Kv);   // K*H -> K*h (single vector operator)
+	  Coperator.apply(V+j*N, Cv);   // C*H -> C*h (single vector operator)
+	  Moperator.apply(V+j*N, Mv);   // M*H -> M*h (single vector operator)
 
-	  
-          Amat[(i+Vdim)*2*Vdim+j] = (i==j) ? -1.0:0.0;
-	  Amat[(i+Vdim)*2*Vdim+j+Vdim]=0.0;
-
-	  Bmat[i*2*Vdim+j] = 3.0;    // todo 
-          Bmat[i*2*Vdim+Vdim+j] = 0.0;
-	  Bmat[(i+Vdim)*2*Vdim+j]=0.0; 
-          Bmat[(i+Vdim)*2*Vdim+j+Vdim] = (i==j) ? -1.0:0.0;
-
+          Kmat(i,j) = complex_dot(N, V+i*N, Kv);  // entry of K 
+          Cmat(i,j) = complex_dot(N, V+i*N, Cv);  // entry of C
+          Mmat(i,j) = complex_dot(N, V+i*N, Mv);  // entry of M
        }
 
+    //--- Assemble the standard eigenvalue problem (completely sequential)---//
+    Mmat = Mmat.inverse();  // inverse of matrix M
+    Cmat = Mmat * Cmat;
+    Kmat = Mmat * Kmat;
+    for (int i=0; i<Vdim; i++)
+       for (int j=0; j<Vdim; j++)
+       {
+          Amat(i,j) = -Cmat(i,j);
+          Amat(i,j+Vdim) = -Kmat(i,j);
+          Amat(i+Vdim,j) = (i==j) ? 1.0:0.0;
+          Amat(i+Vdim,j+Vdim) = 0.0;	  
+       }
+ 
+    /* Solve the projected standard eigenvalue problem 
+     * <Eigen/Eigenvalues> */
+    Eigen::ComplexEigenSolver<Eigen::MatrixXcd> linearEigSolv;
+    linearEigSolv.compute(Amat);
+    /*std::cout << "The eigenvalues of Amat are" << std::endl <<  linearEigSolv.eigenvalues() << std::endl;
+      std::cout << "The matrix of eigenvectors V is" << std::endl << linearEigSolv.eigenvectors() << std::endl;
+      Eigen::VectorXcd v = Amat * linearEigSolv.eigenvectors().col(0) - linearEigSolv.eigenvalues()[0] * linearEigSolv.eigenvectors().col(0);
+      std::cout << "A*v-lambda*v" << std::endl << v << std::endl;*/
 
+ 
+    
 
-    for (int i=0; i<2*Vdim; i++){
+     /*   for (int i=0; i<2*Vdim; i++){
        for (int j=0; j<2*Vdim; j++)
-       {   std::cout << Bmat[i*2*Vdim+j] << "  ";}
+       {   std::cout << Amat(i,j) << "  ";}
        std::cout << "\n";
-    }
+    }*/
 
-    free(Amat);
-    free(Bmat);
+    Vdim += 1;   // search space dimension +1
 
     break;
   }
@@ -114,7 +137,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
   free(KR); free(CR); free(MR);
   free(Kr); free(Cr); free(Mr);
   free(Vp); free(a0);
-  free(V);
+  free(V); free(Kv); free(Cv); free(Mv);
 
   return result_ptr;
 }
