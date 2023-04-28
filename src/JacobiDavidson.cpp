@@ -27,19 +27,21 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
   // there are three things stored in the result: eigenvalue, eigenvector and convergence history
   std::unique_ptr<resultJD> result_ptr(new resultJD);
   result_ptr->eigval = (std::complex<double>*)malloc(sizeof(std::complex<double>)*numeigs);
-  result_ptr->eigvec = (std::complex<double>*)malloc(sizeof(std::complex<double>)*numeigs*(nR+1)*(nr+1));
+  result_ptr->eigvec = (std::complex<double>*)malloc(sizeof(std::complex<double>)*numeigs*N);
   result_ptr->cvg_hist = (double*)malloc(sizeof(double)*maxiter);
 
-  //--- build tensor operator ---//
   std::complex<double>* KR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* CR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* MR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* Kr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
   std::complex<double>* Cr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
   std::complex<double>* Mr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
-  std::complex<double>* Vp = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nr+1));
-  std::complex<double>* a0 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nr+1));
+  std::complex<double>* Vp = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
+  std::complex<double>* a0 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
+  std::complex<double>* res= (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
+  double resNorm;
 
+  //--- build tensor operator ---//
   buildKmatrix(nR, LR, KR);   // K matrix (nR coordinate)
   buildCmatrix(nR, CR);       // C matrix (nR coordinate)  A problem about C matrix.. complex number? Check!
   buildMmatrix(nR, MR);       // M matrix (nR coordinate)
@@ -60,6 +62,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
   std::complex<double>* Kv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
   std::complex<double>* Cv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
   std::complex<double>* Mv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
+  std::complex<double>* vbest = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
 
   complex_init(N, V, 1.0/std::sqrt(N)); // initialize and normalize the first column of search space V
   
@@ -93,7 +96,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
           Mmat(i,j) = complex_dot(N, V+i*N, Mv);  // entry of M
        }
 
-    //--- Assemble the standard eigenvalue problem (completely sequential)---//
+    /* Assemble the standard eigenvalue problem (completely sequential) */
     Mmat = Mmat.inverse();  // inverse of matrix M
     Cmat = Mmat * Cmat;
     Kmat = Mmat * Kmat;
@@ -106,8 +109,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
           Amat(i+Vdim,j+Vdim) = 0.0;	  
        }
  
-    /* Solve the projected standard eigenvalue problem 
-     * <Eigen/Eigenvalues> */
+    /* Solve the projected standard eigenvalue problem <Eigen/Eigenvalues> */
     Eigen::ComplexEigenSolver<Eigen::MatrixXcd> linearEigSolv;
     linearEigSolv.compute(Amat);
     /*std::cout << "The eigenvalues of Amat are" << std::endl <<  linearEigSolv.eigenvalues() << std::endl;
@@ -115,8 +117,85 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
       Eigen::VectorXcd v = Amat * linearEigSolv.eigenvectors().col(0) - linearEigSolv.eigenvalues()[0] * linearEigSolv.eigenvectors().col(0);
       std::cout << "A*v-lambda*v" << std::endl << v << std::endl;*/
 
- 
+    /* different from matlab codes: here we don't compute the 
+     * Ritz vectors v=V*c since we don't need all vectors. */
     
+    /* sort the eigenvalues */
+    Eigen::VectorXcd proj_eigval = linearEigSolv.eigenvalues();  
+    std::vector<int> idx_eigen(2*Vdim);
+    std::iota(idx_eigen.begin(), idx_eigen.end(), 0);  
+    bool sflag;
+    int temp1;
+    std::complex<double> temp2;
+    do{
+       sflag = false;
+       for (int i=0; i<2*Vdim-1; i++)
+       {
+          if (std::abs(proj_eigval[i] - sigma) > std::abs(proj_eigval[i+1] - sigma))
+	  {
+	     temp1 = idx_eigen[i];	  
+             temp2 = proj_eigval[i];
+	     idx_eigen[i] = idx_eigen[i+1];
+	     proj_eigval[i] = proj_eigval[i+1];
+             idx_eigen[i+1] = temp1;
+	     proj_eigval[i+1] = temp2;	     
+	     sflag = true; 
+	  }
+       }
+    }while(sflag);      	    	    
+    int idxBest = idx_eigen[detected];
+    std::complex<double> thetaBest = proj_eigval[detected];
+    //for (int i=0; i<2*Vdim;i++) std::cout<< idx_eigen[i]<< "  "  <<proj_eigval[i] << std::endl; 
+    std::complex<double> cbest[Vdim];
+    for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idxBest)[i+Vdim];
+
+    /* most promising Ritz vector (projected back) */
+    complex_init(N, vbest, 0.0);
+    for (int i=0; i<Vdim; i++) complex_axpby(N, cbest[i], V+i*N, 1.0, vbest); 
+
+    /* residual */
+    Koperator.apply(vbest, Kv);
+    Coperator.apply(vbest, Cv);
+    Moperator.apply(vbest, Mv);
+    complex_init(N, res, 0.0);
+    complex_axpby(N, 1.0, Kv, 1.0, res);
+    complex_axpby(N, thetaBest, Cv, 1.0, res);
+    complex_axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
+    resNorm = std::sqrt(complex_dot(N, res, res).real());
+    if (verbose==1) std::cout << "iteration " << iter << ", residual norm: " << resNorm << std::endl;
+    result_ptr->cvg_hist[iter] = resNorm;
+
+    /* if converge... */
+    if (resNorm < tolerance)
+    {
+       result_ptr->eigval[detected] = thetaBest;
+       vec_update(N, 1.0, vbest, result_ptr->eigvec+detected*N);
+       vec_update(N, 1.0, vbest, V+detected*N);
+       sigma = thetaBest;
+
+       /* reduce the search space if necessary? */ 
+
+       thetaBest = proj_eigval[detected+1];
+       idxBest = idx_eigen[detected+1];
+       complex_init(N, vbest, 0.0);
+       for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idxBest)[i+Vdim];
+       for (int i=0; i<Vdim; i++) complex_axpby(N, cbest[i], V+i*N, 1.0, vbest); 
+     
+       Koperator.apply(vbest, Kv);
+       Coperator.apply(vbest, Cv);
+       Moperator.apply(vbest, Mv);
+       complex_init(N, res, 0.0);
+       complex_axpby(N, 1.0, Kv, 1.0, res);
+       complex_axpby(N, thetaBest, Cv, 1.0, res);
+       complex_axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
+       resNorm = std::sqrt(complex_dot(N, res, res).real());
+
+       detected += 1;
+    }
+
+    /* reduce the search space if necessary */
+
+     
 
      /*   for (int i=0; i<2*Vdim; i++){
        for (int j=0; j<2*Vdim; j++)
@@ -125,6 +204,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
     }*/
 
     Vdim += 1;   // search space dimension +1
+    iter += 1;   // iteration +1
 
     break;
   }
@@ -136,8 +216,8 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
  
   free(KR); free(CR); free(MR);
   free(Kr); free(Cr); free(Mr);
-  free(Vp); free(a0);
-  free(V); free(Kv); free(Cv); free(Mv);
+  free(Vp); free(a0); free(res);
+  free(V); free(Kv); free(Cv); free(Mv); free(vbest);
 
   return result_ptr;
 }
