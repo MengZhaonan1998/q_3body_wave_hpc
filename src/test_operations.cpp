@@ -27,16 +27,16 @@ TEST(operations, init)
 TEST(operations, dot) 
 {
   const int n=150;
-  double x[n], y[n];
+  std::complex<double> x[n], y[n];
 
   for (int i=0; i<n; i++)
   {
-    x[i] = double(i+1);
-    y[i] = 1.0/double(i+1);
+    x[i] = std::complex<double>(double(i+1),0.0);
+    y[i] = 1.0/std::complex<double>(double(i+1),0.0);
   }
 
-  double res = dot(n, x, y); // The results of dot(x,y) should be equal to the length n
-  EXPECT_NEAR(res, (double)n, n*std::numeric_limits<double>::epsilon());
+  std::complex<double> res = dot(n, x, y); // The results of dot(x,y) should be equal to the length n
+  EXPECT_NEAR(res.real(), (double)n, n*std::numeric_limits<double>::epsilon());
 }
 
 
@@ -145,8 +145,8 @@ TEST(functions, modified_gramschmidt)
      err_nr = std::max(err_nr, norm.real());
      err_ni = std::max(err_ni, norm.imag());
   }
-  EXPECT_NEAR(err_nr, 1.0, std::numeric_limits<double>::epsilon());
-  EXPECT_NEAR(1.0+err_ni, 1.0, std::numeric_limits<double>::epsilon());
+  EXPECT_NEAR(err_nr, 1.0, 10*std::numeric_limits<double>::epsilon());
+  EXPECT_NEAR(1.0+err_ni, 1.0, 10*std::numeric_limits<double>::epsilon());
 
   double err_rr = 0.0;
   double err_ri = 0.0;

@@ -23,11 +23,14 @@ void complex_init(int n, std::complex<double>* x, std::complex<double> value)
 }
 
 
-double dot(int n, double const* x, double const* y)
+std::complex<double> dot(int n, std::complex<double> const* x, std::complex<double> const* y)
 {
-  double res=0.0;
+  std::complex<double> res=0.0;
   
-  #pragma omp parallel for reduction(+:res)   // I use reduction(+:res) here due to the operation +=
+  /* It's already 2023, and OpenMP still doesn't support complex number operations?! 
+   * No... We can define the reduction using 'declare' */
+  #pragma omp declare reduction(+: std::complex<double>: omp_out += omp_in) initializer (omp_priv = omp_orig) 
+  #pragma omp parallel for reduction(+:res) 
   for (int i=0; i<n; i++)
      res += x[i]*y[i];
   
@@ -39,7 +42,8 @@ std::complex<double> complex_dot(int n, std::complex<double> const* x, std::comp
 {
   std::complex<double> res(0.0,0.0);
   
- // #pragma omp parallel for reduction(+:res)
+  #pragma omp declare reduction(+: std::complex<double>: omp_out += omp_in) initializer (omp_priv = omp_orig)
+  #pragma omp parallel for reduction(+:res)
   for (int i=0; i<n; i++)
      res += std::conj(x[i]) * y[i];
 
@@ -58,15 +62,17 @@ void axpby(int n, double a, double const* x, double b, double* y)
 
 void complex_axpby(int n, std::complex<double> a, std::complex<double>* x, std::complex<double> b, std::complex<double>* y)
 {
+  #pragma omp parallel for
   for (int i=0; i<n; i++)
      y[i] = (a * x[i] + b * y[i]);
   return;
 }
 
 
-void complex_0xpby(int n, std::complex<double> b, std::complex<double>* y)
+void vec_update(int n, std::complex<double> a, std::complex<double>* x, std::complex<double>* y)
 {
+  #pragma omp parallel for
   for (int i=0; i<n; i++)
-     y[i] = b * y[i];
+     y[i] = a * x[i];
   return;
 }
