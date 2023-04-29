@@ -1,4 +1,5 @@
 #include "operations.hpp"
+#include "tensor3b1d.hpp"
 #include "header.hpp"
 
 void init(int n, double* x, double value)
@@ -50,6 +51,22 @@ std::complex<double> complex_dot(int n, std::complex<double> const* x, std::comp
   return res;
 }
 
+/*
+double dot(int const local_n, double const* x, double const* y) {
+double local_dot = 0.0;
+
+int size;
+MPI_Comm_size(MPI_COMM_WORLD, &size);
+for (int id = 0; id < local_n; id++) {
+	local_dot += x[id] * y[id];
+}
+
+double global_dot;
+MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+return global_dot;
+}*/
+
 
 void axpby(int n, double a, double const* x, double b, double* y)
 {
@@ -60,7 +77,7 @@ void axpby(int n, double a, double const* x, double b, double* y)
 }
 
 
-void complex_axpby(int n, std::complex<double> a, std::complex<double>* x, std::complex<double> b, std::complex<double>* y)
+void complex_axpby(int n, std::complex<double> a, std::complex<double> const* x, std::complex<double> b, std::complex<double>* y)
 {
   #pragma omp parallel for
   for (int i=0; i<n; i++)
@@ -69,10 +86,11 @@ void complex_axpby(int n, std::complex<double> a, std::complex<double>* x, std::
 }
 
 
-void vec_update(int n, std::complex<double> a, std::complex<double>* x, std::complex<double>* y)
+void vec_update(int n, std::complex<double> a, std::complex<double> const* x, std::complex<double>* y)
 {
   #pragma omp parallel for
   for (int i=0; i<n; i++)
      y[i] = a * x[i];
   return;
 }
+
