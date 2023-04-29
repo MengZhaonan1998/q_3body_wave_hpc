@@ -1,4 +1,5 @@
 #pragma once
+#include "operations.hpp"
 
 namespace QRes
 {
@@ -41,6 +42,53 @@ namespace QRes
       ST* C_;
       ST* D_;
       ST* V_;
+  };
+
+  template<typename ST>
+  class CorrectOp{
+    public:
+      CorrectOp(int N, 
+		QRes::Kron2D<ST> Koperator, 
+		QRes::Kron2D<ST> Coperator,
+		QRes::Kron2D<ST> Moperator,
+		ST* u, ST* w, ST theta):
+	  N_(N), Kop_(Koperator), Cop_(Coperator), Mop_(Moperator),
+	  u_(u), w_(w), theta_(theta){};
+      int N_; 
+      void apply(const ST* v_in, ST* v_out)
+      {
+        std::complex<double>* vtemp1 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N_);
+	std::complex<double>* vtemp2 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N_);
+	std::complex<double> dux,duy,duw;
+
+	dux = complex_dot(N_, u_, v_in);            // u'*v_in
+	vec_update(N_, 1.0, v_in, vtemp1);          // vtemp = v_in
+	complex_axpby(N_, -dux, u_, 1.0, vtemp1);   // vtemp = v_out - dux*u
+        
+	/* v_out = tensorapply(K,vtemp1) + 
+	 *   theta*tensorapply(C,vtemp1) + 
+	 *   theta*theta*tensorapply(M,vtemp1) */
+	Kop_.apply(vtemp1, v_out);                  
+	Cop_.apply(vtemp1, vtemp2); 
+	complex_axpby(N_, theta_, vtemp2, 1.0, v_out);
+	Mop_.apply(vtemp1, vtemp2);
+	complex_axpby(N_, theta_*theta_, vtemp2, 1.0, v_out);
+	
+	duy = complex_dot(N_, u_, v_out);            // duy = u'*v_out
+	duw = complex_dot(N_, u_, w_);               // duw = u'*w
+        complex_axpby(N_, -duy/duw, w_, 1.0, v_out); // v_out = v_out - (duy/duw)*w
+
+	free(vtemp1); free(vtemp2);
+	return;
+      }
+
+    private:
+      QRes::Kron2D<ST> Kop_;
+      QRes::Kron2D<ST> Cop_;
+      QRes::Kron2D<ST> Mop_;
+      ST* u_;
+      ST* w_;
+      ST theta_;
   };
 
 }
