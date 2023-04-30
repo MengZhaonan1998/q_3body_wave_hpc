@@ -4,7 +4,9 @@
 #include "operations.hpp"
 #include "gmres_solver.hpp"
 
-std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::map<std::string, std::string> jdopts)
+std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
+		                         std::map<std::string, std::string> jdopts,
+					 std::map<std::string, std::string> gmresopts)
 {
   //--- mpi ---//
   int proc_rank;                             // processor rank
@@ -24,11 +26,11 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
   std::complex<double> sigma(stod(jdopts["target_real"]),stod(jdopts["target_imag"])); // target (shift) (complex)
   
   //--- some settings for GMRES ---//
-  double resNorm_gmres;
-  double tol_gmres = 1e-4; 
   int numIter_gmres;
-  int maxiter_gmres = 30; 
-  int verbose_gmres = 0;
+  int maxiter_gmres= stoi(gmresopts["maxiter"]); 
+  int verbose_gmres =stoi(gmresopts["verbose"]);
+  double tol_gmres = stod(gmresopts["tolerance"]); 
+  double resNorm_gmres;
 
   //--- there are three things stored in the result: eigenvalue, eigenvector and convergence history ---//
   std::unique_ptr<resultJD> result_ptr(new resultJD);                                           // unique pointer used to store the result
@@ -196,7 +198,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
        detected += 1;
     }
 
-    /* reduce the search space if necessary */
+    /* reduce the search space if necessary TODO...*/
     if (Vdim == maxdim)
     {	    
        for (int j=0; j<mindim; j++)
@@ -213,32 +215,21 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::
     /* solve the (preconditioned) correction equation */
     Coperator.apply(vbest, z);
     complex_axpby(N, 2.0*thetaBest, Mv, 1.0, z); 
-    QRes::CorrectOp<std::complex<double>> correctOp(N, Koperator, Coperator, Moperator, vbest, z, thetaBest); 
-    
-    double resNorm_gmres;
-    int numIter_gmres;
-    complex_init(N, t, 0.0);
-    vec_update(N, -1.0, res, b); 
+    QRes::CorrectOp<std::complex<double>> correctOp(N, Koperator, Coperator, Moperator, vbest, z, thetaBest);  // linear operator of the correction equation
+     
+    complex_init(N, t, 0.0);      // initial guess t0=zeros(N,1)
+    vec_update(N, -1.0, res, b);  // rhs b=-r
     gmres_solver(&correctOp, N, t, b, tol_gmres, maxiter_gmres, &resNorm_gmres, &numIter_gmres, verbose_gmres);
     std::cout << ", residual norm of gmres: "<< resNorm_gmres << std::endl;
 
     /* expand the search space V */
-    
-  //for (int i=0; i<N; i++) V[i+Vdim*N]=double(rand()%10)/10;
-   
-    
+    vec_update(N, 1.0, t, V+N*Vdim);   // expand the search space V
+    modifiedGS(V, N, Vdim+1);          // modified Gram-Schmidt orthogonalization
 
     Vdim += 1;   // search space dimension +1
     iter += 1;   // iteration +1
-
-    break;
   }
 
-  for (int i=0; i< numeigs; i++)  result_ptr->eigval[i] = 1i;
-
-// proc_rank=1;
-  // result_ptr->eigvec = (double*)malloc(5 * (nR+1) * (nr+1) * sizeof(double));
- 
   free(KR); free(CR); free(MR);
   free(Kr); free(Cr); free(Mr);
   free(Vp); free(a0); free(res);
