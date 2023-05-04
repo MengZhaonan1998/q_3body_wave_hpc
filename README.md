@@ -3,7 +3,7 @@
 ### What is QRes3b?
 QRes3b aims at computing resonant states of 1-dimensional quantum mechanical three-body problems. A quantum two/three-body system can be described by a very well-known equation in the quantum world - the Schrödinger equation. In a two-body system, the interaction between two quantum particles conforms to the stationary Schrödinger equation:Cancel changes
 $$H\psi=E\psi,$$
-where the Hamiltonian operator $$H$$ is given by 
+where the Hamiltonian operator $H$ is given by 
 $$H = -\frac{1}{2}\Delta(x) + V(x).$$
 For simplicity we omit the physical constants such as the Planck's constant in the equation. To extract the resonant states from the above eigenvalue problem, one needs to impose some proper boundary conditions (for more details about resonances please refer to https://www.cs.cornell.edu/~bindel/cims/resonant1d/theo2.html):  
 $$(\partial_x-ik)\psi(x)=0 \ at \ x=-L,$$ 
