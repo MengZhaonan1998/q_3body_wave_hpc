@@ -288,7 +288,7 @@ TEST(functions, gmres_solver)
   EXPECT_NEAR(1.0+err, 1.0, 10*std::numeric_limits<double>::epsilon());
 }
 
-/*
+
 TEST(functions, modified_gramschmidt)
 {
   using namespace std::complex_literals;
@@ -297,14 +297,26 @@ TEST(functions, modified_gramschmidt)
                                  0.2607 + 0.6999i, 0.5944 + 0.6385i, 0.0225 + 0.0336i, 0.4253 + 0.0688i,
                                  0.4219 - 0.4712i, 0.9731 + 0.4214i, 0.1289 - 0.5839i, 0.6731 + 0.8571i};
   int m=4; int n=4;
-  modifiedGS(V, m, n);
+  int loc_m = domain_decomp(m);
+  int loc_len = loc_m * n;
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  std::complex<double> loc_V[loc_len];
+  for (int i=0; i<n; i++)
+    for (int j=0; j<loc_m; j++)  
+       loc_V[i*loc_m+j] = V[i*loc_m+rank*loc_m+j];
+
+  modifiedGS(loc_V, loc_m, n);
 
   double err_nr = 0.0;
   double err_ni = 0.0;
   std::complex<double> norm;
+    
   for (int i=0; i<n; i++)
   {
-     norm = complex_dot(m, V+m*i, V+m*i);
+     norm = complex_dot(loc_m, loc_V+loc_m*i, loc_V+loc_m*i);
      err_nr = std::max(err_nr, norm.real());
      err_ni = std::max(err_ni, norm.imag());
   }
@@ -316,16 +328,17 @@ TEST(functions, modified_gramschmidt)
   for (int i=1; i<n; i++)
      for (int j=0; j<i; j++)
      {
-        norm = complex_dot(m, V+m*j, V+m*i);
+        norm = complex_dot(loc_m, loc_V+loc_m*j, loc_V+loc_m*i);
         err_rr = std::max(err_rr, norm.real());
         err_ri = std::max(err_ri, norm.imag());
      }
 
   EXPECT_NEAR(1.0+err_rr, 1.0, 10*std::numeric_limits<double>::epsilon());
   EXPECT_NEAR(1.0+err_ri, 1.0, 10*std::numeric_limits<double>::epsilon());
+
 }
 
-*/
+
 
 TEST(buildoperator, chebyshevDiffMat)
 {
