@@ -8,21 +8,19 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
 		                         std::map<std::string, std::string> jdopts,
 					 std::map<std::string, std::string> gmresopts)
 {
-  //--- mpi ---//
-  int proc_rank;                             // processor rank
-  int proc_numb;                             // number of processors
-  MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank); // get processor rank
-  MPI_Comm_size(MPI_COMM_WORLD, &proc_numb); // get processor number
+  //--- MPI Initialization ---//
+  int rank;                               // processor rank
+  int size;                               // number of processors
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);   // get processor rank
+  MPI_Comm_size(MPI_COMM_WORLD, &size);   // get processor number
 
   //--- some settings for JacobiDavidson ---//
-  using namespace std::complex_literals; 
-  int N = (nr+1)*(nR+1);       // total problem size 
   int numeigs = stoi(jdopts["numeigs"]);        // number of eigenvalues desired
-  int mindim = stoi(jdopts["mindim"]);          // minimum dimension of search space V
-  int maxdim = stoi(jdopts["maxdim"]);          // maximum dimension of search space V
+  int mindim  = stoi(jdopts["mindim"]);         // minimum dimension of search space V
+  int maxdim  = stoi(jdopts["maxdim"]);         // maximum dimension of search space V
   int maxiter = stoi(jdopts["maxiter"]);        // maximum number of iterations 
-  double tolerance = stod(jdopts["tolerance"]); // tolerance of residual norm
   int verbose = stoi(jdopts["verbose"]);        // verbose controlling cout
+  double tolerance = stod(jdopts["tolerance"]); // tolerance of residual norm
   std::complex<double> sigma(stod(jdopts["target_real"]),stod(jdopts["target_imag"])); // target (shift) (complex)
   
   //--- some settings for GMRES ---//
@@ -32,53 +30,61 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
   double tol_gmres = stod(gmresopts["tolerance"]); 
   double resNorm_gmres;
 
-  //--- there are three things stored in the result: eigenvalue, eigenvector and convergence history ---//
-  std::unique_ptr<resultJD> result_ptr(new resultJD);                                           // unique pointer used to store the result
-  result_ptr->eigval = (std::complex<double>*)malloc(sizeof(std::complex<double>)*numeigs);     // eigenvalues detected
-  result_ptr->eigvec = (std::complex<double>*)malloc(sizeof(std::complex<double>)*numeigs*N);   // corresponding eigenvectors
-  result_ptr->cvg_hist = (double*)malloc(sizeof(double)*maxiter);                               // convergence history
+  //--- domain decomposition ---// 
+  int N = (nR+1)*(nr+1);             // total problem size 
+  int loc_nR = domain_decomp(nR+1);  // partition nR dimension
+  int loc_N = loc_nR * (nr+1);       // local problem size
 
-  //--- memory allocation ---//
+  //--- there are three things stored in the result: eigenvalue, eigenvector and convergence history ---//
+  std::unique_ptr<resultJD> result_ptr(new resultJD);                                               // unique pointer used to store the result
+  result_ptr->eigval = (std::complex<double>*)malloc(sizeof(std::complex<double>)*numeigs);         // eigenvalues detected
+  result_ptr->eigvec = (std::complex<double>*)malloc(sizeof(std::complex<double>)*numeigs*loc_N);   // corresponding eigenvectors
+  result_ptr->cvg_hist = (double*)malloc(sizeof(double)*maxiter);                                   // convergence history
+
+  //--- memory allocation ---//  
   std::complex<double>* KR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* CR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* MR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* Kr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
   std::complex<double>* Cr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
   std::complex<double>* Mr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
-  std::complex<double>* Vp = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
-  std::complex<double>* a0 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
-  std::complex<double>* res= (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
-  std::complex<double>* z = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
-  std::complex<double>* t = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);
-  std::complex<double>* b = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N); 
+  std::complex<double>* Vp = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
+  std::complex<double>* a0 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
+  std::complex<double>* res= (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
+  std::complex<double>* z = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
+  std::complex<double>* t = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
+  std::complex<double>* b = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N); 
   double resNorm;
 
   //--- build tensor operator ---//
-  buildKmatrix(nR, LR, KR);   // K matrix (nR coordinate)
-  buildCmatrix(nR, CR);       // C matrix (nR coordinate)  A problem about C matrix.. complex number? Check!
-  buildMmatrix(nR, MR);       // M matrix (nR coordinate)
-  buildKmatrix(nr, Lr, Kr);   // K matrix (nr coordinate)
-  buildCmatrix(nr, Cr);       // C matrix (nr coordinate)
-  buildMmatrix(nr, Mr);       // M matrix (nr coordinate)
-  buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // (already checked)
-  init(N, a0, 0.0);
+  buildKmatrix(nR, LR, KR);           // K matrix (nR coordinate) 
+  buildKmatrix(nr, Lr, Kr);           // K matrix (nr coordinate)
+  buildMmatrix(nR, MR);               // M matrix (nR coordinate)
+  buildMmatrix(nr, Mr);               // M matrix (nr coordinate)
+  buildCmatrix_complex(nR, CR);       // C matrix (nR coordinate) 
+  buildCmatrix_complex(nr, Cr);       // C matrix (nr coordinate)
+  buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // Gaussian potential (already checked)
+  init(loc_N, a0, 0.0);
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
   QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	   
   QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
 	   
   //--- search space V (stored by column major!) ---//
-  std::complex<double>* V = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N*maxdim); // search space V (N*maxdim)
-  std::complex<double>* v = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N*mindim); // minor-search space v (N*mindim) used to store space vectors temporarily
-  std::complex<double>* Kv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);       // tensor_K*V[:,i] -> Kv
-  std::complex<double>* Cv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);       // tensor_C*V[:,i] -> Cv
-  std::complex<double>* Mv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);       // tensor_M*V[:,i] -> Mv
-  std::complex<double>* vbest = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);    // best Ritz vector
-  init(N, V, 1.0/std::sqrt(N)); // initialize and normalize the first column of search space V
+  std::complex<double>* V = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N*maxdim); // search space V (N*maxdim)
+  std::complex<double>* v = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N*mindim); // minor-search space v (N*mindim) used to store space vectors temporarily
+  std::complex<double>* Kv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);       // tensor_K*V[:,i] -> Kv
+  std::complex<double>* Cv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);       // tensor_C*V[:,i] -> Cv
+  std::complex<double>* Mv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);       // tensor_M*V[:,i] -> Mv
+  std::complex<double>* vbest = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);    // best Ritz vector
+  init(loc_N, V, 1.0/std::sqrt(N));    // initialize and normalize the first column of search space V
   
-  int iter = 0;     // iteration number
-  int detected = 0; // number of eigenpairs found
-  int Vdim = 1;     // dimension of the search space V
+  int iter = 0;                        // iteration number
+  int detected = 0; 		       // number of eigenpairs found
+  int Vdim = 1;                        // dimension of the search space V
   
+  MPI_Barrier(MPI_COMM_WORLD);         // synchronization 
+  if (rank==0) std::cout << "Container assembly is finished. Iteration starts." << std::endl;
+
   //--- start Jacobi-Davidson iteration ---//
   while(iter<maxiter && detected<numeigs)
   {
@@ -95,14 +101,15 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
     for (int i=0; i<Vdim; i++)
        for (int j=0; j<Vdim; j++)
        {
-          Koperator.apply(V+j*N, Kv);   // K*H -> K*h (single vector operator)
-	  Coperator.apply(V+j*N, Cv);   // C*H -> C*h (single vector operator)
-	  Moperator.apply(V+j*N, Mv);   // M*H -> M*h (single vector operator)
+          Koperator.apply(V+j*loc_N, Kv);   // K*H -> K*h (single vector operator)
+	  Coperator.apply(V+j*loc_N, Cv);   // C*H -> C*h (single vector operator)
+	  Moperator.apply(V+j*loc_N, Mv);   // M*H -> M*h (single vector operator)
 
-          Kmat(i,j) = complex_dot(N, V+i*N, Kv);  // entry of K 
-          Cmat(i,j) = complex_dot(N, V+i*N, Cv);  // entry of C
-          Mmat(i,j) = complex_dot(N, V+i*N, Mv);  // entry of M
+          Kmat(i,j) = complex_dot(loc_N, V+i*loc_N, Kv);  // entry of K 
+          Cmat(i,j) = complex_dot(loc_N, V+i*loc_N, Cv);  // entry of C
+          Mmat(i,j) = complex_dot(loc_N, V+i*loc_N, Mv);  // entry of M
        }
+    MPI_Barrier(MPI_COMM_WORLD);  // synchronization
 
     /* Assemble the standard eigenvalue problem (completely sequential) 
      * -                 -
@@ -159,41 +166,44 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
     std::complex<double> cbest[Vdim];
     for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idxBest)[i+Vdim];
 
+    MPI_Barrier(MPI_COMM_WORLD);  // synchronization
+
     /* most promising Ritz vector (projected back) */
-    init(N, vbest, 0.0);
-    for (int i=0; i<Vdim; i++) axpby(N, cbest[i], V+i*N, 1.0, vbest); 
+    init(loc_N, vbest, 0.0);
+    for (int i=0; i<Vdim; i++) axpby(loc_N, cbest[i], V+i*loc_N, 1.0, vbest); 
 
     /* residual */
     Coperator.apply(vbest, Cv);
     Moperator.apply(vbest, Mv);
     Koperator.apply(vbest, res);
-    axpby(N, thetaBest, Cv, 1.0, res);
-    axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
-    resNorm = std::sqrt(complex_dot(N, res, res).real());
-    if (verbose==1) std::cout << "iteration " << iter << ", residual norm: " << resNorm;
+    axpby(loc_N, thetaBest, Cv, 1.0, res);
+    axpby(loc_N, thetaBest*thetaBest, Mv, 1.0, res);
+    resNorm = std::sqrt(complex_dot(loc_N, res, res).real());
+
+    if (verbose==1) {if (rank==0) std::cout << "iteration " << iter << ", residual norm: " << resNorm;}
     result_ptr->cvg_hist[iter] = resNorm;
 
     /* if converge... */
     if (resNorm < tolerance)
     {
        result_ptr->eigval[detected] = thetaBest;
-       vec_update(N, 1.0, vbest, result_ptr->eigvec+detected*N);
-       vec_update(N, 1.0, vbest, V+detected*N);
+       vec_update(loc_N, 1.0, vbest, result_ptr->eigvec+detected*loc_N);
+       vec_update(loc_N, 1.0, vbest, V+detected*loc_N);
        sigma = thetaBest;
 
        /* reduce the search space if necessary? */ 
 
        thetaBest = proj_eigval[detected+1];
        idxBest = idx_eigen[detected+1];
-       init(N, vbest, 0.0);
+       init(loc_N, vbest, 0.0);
        for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idxBest)[i+Vdim];
-       for (int i=0; i<Vdim; i++) axpby(N, cbest[i], V+i*N, 1.0, vbest); 
+       for (int i=0; i<Vdim; i++) axpby(loc_N, cbest[i], V+i*loc_N, 1.0, vbest); 
      
        Coperator.apply(vbest, Cv);
        Moperator.apply(vbest, Mv);
        Koperator.apply(vbest, res);
-       axpby(N, thetaBest, Cv, 1.0, res);
-       axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
+       axpby(loc_N, thetaBest, Cv, 1.0, res);
+       axpby(loc_N, thetaBest*thetaBest, Mv, 1.0, res);
 
        detected += 1;
     }
@@ -203,28 +213,29 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
     {	    
        for (int j=0; j<mindim; j++)
        {
-	  init(N, v+j*N, 0.0);     
+	  init(loc_N, v+j*loc_N, 0.0);     
           for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idx_eigen[j])[i+Vdim];
-          for (int i=0; i<Vdim; i++) axpby(N, cbest[i], V+i*N, 1.0, v+j*N);  
+          for (int i=0; i<Vdim; i++) axpby(loc_N, cbest[i], V+i*loc_N, 1.0, v+j*loc_N);  
        }
-       vec_update(N*mindim, 1.0, v, V);
-       if (detected != 0) vec_update(N*detected, 1.0, result_ptr->eigvec, V);
+       vec_update(loc_N*mindim, 1.0, v, V);
+       if (detected != 0) vec_update(loc_N*detected, 1.0, result_ptr->eigvec, V);
        Vdim = mindim;
     }
-     
+    MPI_Barrier(MPI_COMM_WORLD);  // synchronization
+
     /* solve the (preconditioned) correction equation */
     Coperator.apply(vbest, z);
-    axpby(N, 2.0*thetaBest, Mv, 1.0, z); 
-    QRes::CorrectOp<std::complex<double>> correctOp(N, Koperator, Coperator, Moperator, vbest, z, thetaBest);  // linear operator of the correction equation
+    axpby(loc_N, 2.0*thetaBest, Mv, 1.0, z); 
+    QRes::CorrectOp<std::complex<double>> correctOp(loc_N, Koperator, Coperator, Moperator, vbest, z, thetaBest);  // linear operator of the correction equation
      
-    init(N, t, 0.0);      // initial guess t0=zeros(N,1)
-    vec_update(N, -1.0, res, b);  // rhs b=-r
-    gmres_solver(&correctOp, N, t, b, tol_gmres, maxiter_gmres, &resNorm_gmres, &numIter_gmres, verbose_gmres);
-    std::cout << ", residual norm of gmres: "<< resNorm_gmres << std::endl;
+    init(loc_N, t, 0.0);      // initial guess t0=zeros(N,1)
+    vec_update(loc_N, -1.0, res, b);  // rhs b=-r
+    gmres_solver(&correctOp, loc_N, t, b, tol_gmres, maxiter_gmres, &resNorm_gmres, &numIter_gmres, verbose_gmres);
+    if (verbose==1){ if (rank==0) std::cout << ", residual norm of gmres: "<< resNorm_gmres << std::endl;}
 
     /* expand the search space V */
-    vec_update(N, 1.0, t, V+N*Vdim);   // expand the search space V
-    modifiedGS(V, N, Vdim+1);          // modified Gram-Schmidt orthogonalization
+    vec_update(loc_N, 1.0, t, V+loc_N*Vdim);   // expand the search space V
+    modifiedGS(V, loc_N, Vdim+1);          // modified Gram-Schmidt orthogonalization
 
     Vdim += 1;   // search space dimension +1
     iter += 1;   // iteration +1
