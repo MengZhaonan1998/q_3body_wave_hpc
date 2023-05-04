@@ -1,7 +1,5 @@
 
-#ifdef USE_MPI
 #include <mpi.h>
-#endif
 
 #include "gtest_mpi.hpp"
 
@@ -10,13 +8,15 @@ GTEST_API_ int main(int argc, char **argv) {
 
     testing::InitGoogleTest(&argc, argv);
 
-    int rank = 0;
-#ifdef USE_MPI
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-#endif
+    int proc_rank;
+    int proc_numb;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &proc_numb);
 
     // on MPI ranks != 0 remove the default output listeners if there are any
-    if( rank != 0 )
+    if( proc_rank != 0 )
     {
       ::testing::TestEventListener* defaultListener = ::testing::UnitTest::GetInstance()->listeners().default_result_printer();
       ::testing::UnitTest::GetInstance()->listeners().Release(defaultListener);
@@ -28,6 +28,8 @@ GTEST_API_ int main(int argc, char **argv) {
     }
 
     test_result=RUN_ALL_TESTS();
+
+    MPI_Finalize();
 
     return test_result;
 }

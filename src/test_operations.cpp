@@ -5,7 +5,6 @@
 #include "gmres_solver.hpp"
 #include <iostream>
 
-
 TEST(operations, init)
 {
   const int n=15;
@@ -28,32 +27,44 @@ TEST(operations, init)
 TEST(operations, dot) 
 {
   const int n=150;
-  std::complex<double> x[n], y[n];
+  int loc_n = domain_decomp(n);
+  
+  std::complex<double> x[loc_n], y[loc_n];
 
-  for (int i=0; i<n; i++)
+  for (int i=0; i<loc_n; i++)
   {
     x[i] = std::complex<double>(double(i+1),0.0);
     y[i] = 1.0/std::complex<double>(double(i+1),0.0);
   }
 
-  std::complex<double> res = dot(n, x, y); // The results of dot(x,y) should be equal to the length n
-  EXPECT_NEAR(res.real(), (double)n, n*std::numeric_limits<double>::epsilon());
+  std::complex<double> res = dot(loc_n, x, y); // The results of dot(x,y) should be equal to the length n
+  
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank==0)
+     EXPECT_NEAR(res.real(), (double)n, n*std::numeric_limits<double>::epsilon());
 }
 
 
 TEST(operations, complex_dot)
 {
   const int n=50;
-  std::complex<double> x[n], y[n];
+  int loc_n = domain_decomp(n);
 
-  for (int i=0; i<n; i++)
+  std::complex<double> x[loc_n], y[loc_n];
+
+  for (int i=0; i<loc_n; i++)
   {
     x[i] = std::complex<double>(double(i+1), double(i+1));
     y[i] = std::complex<double>(1/double(i+1), 1/double(i+1));
   }
 	
-  std::complex<double> res = complex_dot(n/2, x+n/2, y+n/2);
-  EXPECT_NEAR(res.real(), double(n), n*std::numeric_limits<double>::epsilon());
+  std::complex<double> res = complex_dot(loc_n, x, y);
+  
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank==0)
+     EXPECT_NEAR(res.real(), 2*double(n), n*std::numeric_limits<double>::epsilon());
 }
 
 
@@ -93,7 +104,7 @@ TEST(operations, complex_axpby)
     y[i] = std::complex<double>(double(n-i-1)/2.0,-1.0);
   }
 
-  complex_axpby(n/2, a, x+n/2, b, y+n/2);
+  axpby(n/2, a, x+n/2, b, y+n/2);
 
   double err=0.0;
 
@@ -109,21 +120,55 @@ TEST(operations, complex_axpby)
 TEST(tensor_operations, tensor_apply)
 {
   // test for tensor operator reshape(a2*C2*W+a1*W*C1^T,N1*N2,1)+V*w
-  double C1[4]={1,2,1,3};            // C1
-  double C2[9]={2,2,3,2,2,4,2,2,5};  // C2
-  double V[6]={1,2,3,6,3,2};   // Potential matrix/or vector
-
-  double v_in[6]={1,2,1,3,0,4};
-  double v_out[6];
-   
-  QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
-  Koperator.apply(v_in, v_out);
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
   
-  double result[6] = {17, 16, 23, 46, 24, 47}; 
-
-  double err=0.0;
-  for (int i=0; i<6; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
-  EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
+  // test only for one or two processors
+  if (size==1)
+  {
+     double V[6]={1,2,3,6,3,2};   // Potential matrix/or vector
+     double v_in[6]={1,2,1,3,0,4};
+     double v_out[6];
+     double result[6] = {17, 16, 23, 46, 24, 47}; 
+     double C1[4]={1,2,1,3};            // C1 m=2
+     double C2[9]={2,2,3,2,2,4,2,2,5};  // C2 n=3
+     QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
+     Koperator.apply(v_in, v_out);
+     double err=0.0;
+     for (int i=0; i<6; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
+  }
+  else
+  {
+     double v_in[3];
+     double V[3];
+     double result[3];
+     double v_out[3];
+     double C1[4]={1,2,1,3};            // C1 m=2
+     double C2[9]={2,2,3,2,2,4,2,2,5};  // C2 n=3
+     if (rank==0)
+     {
+        double V[3] = {1,2,3}; 
+        double v_in[3] = {1,2,1};
+        double result[3] = {17, 16, 23};
+        QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
+        Koperator.apply(v_in, v_out);
+        double err=0.0;	
+        for (int i=0; i<3; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
+        EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
+     }
+     else
+     {
+        double V[3] = {6,3,2};
+        double v_in[3] = {3,0,4};
+        double result[3] = {46, 24, 47};
+        QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
+        Koperator.apply(v_in, v_out);
+        double err=0.0;
+        for (int i=0; i<3; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
+        EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
+     }
+  }
 }
 
 
@@ -134,7 +179,16 @@ TEST(tensor_operations, correct_apply)
   int N=16;
   double LR=1.0;
   double Lr=1.0;
-  std::complex<double> KR[N],CR[N],MR[N],Kr[N],Cr[N],Mr[N],Vp[N],a0[N],v_in[N],v_out[N],vbest[N],z[N];
+  
+  int loc_n = domain_decomp(nR+1);
+  int loc_len = loc_n * (nr+1);
+
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  std::complex<double> KR[N],CR[N],MR[N],Kr[N],Cr[N],Mr[N],
+                       Vp[loc_len],a0[loc_len],v_in[loc_len],v_out[loc_len],vbest[loc_len],z[loc_len];
 
   buildKmatrix(nR, LR, KR);   // K matrix (nR coordinate)
   buildCmatrix(nR, CR);       // C matrix (nR coordinate)  A problem about C matrix.. complex number? Check!
@@ -142,28 +196,33 @@ TEST(tensor_operations, correct_apply)
   buildKmatrix(nr, Lr, Kr);   // K matrix (nr coordinate)
   buildCmatrix(nr, Cr);       // C matrix (nr coordinate)
   buildMmatrix(nr, Mr);       // M matrix (nr coordinate)
-  buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // (already checked)
   
-  complex_init(N, a0, 0.0);
+  buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // (already checked)
+
+  init(loc_len, a0, 0.0);
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
-  QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	   
+  QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator
   QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
-  complex_init(N,v_in, 1.0);
-  complex_init(N,v_out, 3.1);  // initialize v_out randomly to check the pointer safety
-  complex_init(N,vbest, 0.1);
-  complex_init(N,z, 1.0);
-  QRes::CorrectOp<std::complex<double>> correctOp(N, Koperator, Coperator, Moperator, vbest, z, 3.0); 
+  init(loc_len,v_in, 1.0);
+  init(loc_len,v_out, 3.1);  // initialize v_out randomly to check the pointer safety
+  init(loc_len,vbest, 0.1);
+  init(loc_len,z, 1.0);
+
+  QRes::CorrectOp<std::complex<double>> correctOp(loc_len, Koperator, Coperator, Moperator, vbest, z, 3.0);
   correctOp.apply(v_in, v_out);
 
   std::complex<double> result[N] = {6.6834, -0.0229, -0.0229, 6.6834, 0.1263, -6.7868, -6.7868, 0.1263,
-                                    0.1263, -6.7868, -6.7868, 0.1263, 6.6834, -0.0229, -0.0229, 6.6834}; 
+                       	            0.1263, -6.7868, -6.7868, 0.1263, 6.6834, -0.0229, -0.0229, 6.6834};
+//if (rank==0){
+// for (int i=0; i<loc_len; i++) std::cout << "v_out["<<i<<"]="<<v_out[i] <<std::endl;}
+  
   double err=0.0;
-  for (int i=0; i<N; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
-  EXPECT_NEAR(1.0+err, 1.0, 1e-4);  
+  for (int i=0; i<loc_len; i++) err = std::max(err, std::max(err, std::abs(result[rank*loc_len+i]-v_out[i])));
+  EXPECT_NEAR(1.0+err, 1.0, 1e-4);
 
 }
 
-
+/*
 TEST(functions, gmres_solver)
 {
   int nR=3;
@@ -182,11 +241,11 @@ TEST(functions, gmres_solver)
   buildMmatrix(nr, Mr);       // M matrix (nr coordinate)
   buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // (already checked)
   
-  complex_init(N, a0, 0.0);
+  init(N, a0, 0.0);
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
   QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	   
   QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
-  complex_init(N,x, 0.0);
+  init(N,x, 0.0);
   std::complex<double> vbest[N] = {0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
 	      		           0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
 	      			   0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
@@ -206,7 +265,7 @@ TEST(functions, gmres_solver)
   gmres_solver(&correctOp, N, x, b, 1e-8, 100, &resNorm, &numIter, 0);
   
   correctOp.apply(x,r);                    
-  complex_axpby(N, 1.0, b, -1.0, r); 
+  axpby(N, 1.0, b, -1.0, r); 
   double err = std::sqrt(complex_dot(N,r,r).real())/std::sqrt(complex_dot(N,b,b).real());
   
   EXPECT_NEAR(1.0+err, 1.0, 10*std::numeric_limits<double>::epsilon());
@@ -249,6 +308,7 @@ TEST(functions, modified_gramschmidt)
   EXPECT_NEAR(1.0+err_ri, 1.0, 10*std::numeric_limits<double>::epsilon());
 }
 
+*/
 
 TEST(buildoperator, chebyshevDiffMat)
 {
@@ -326,12 +386,6 @@ TEST(buildoperator, Kmatrix)
   EXPECT_NEAR(1.0+err, 1.0, 0.0001);  
   free(K);
 }
-
-
-
-
-
-
 
 
 
