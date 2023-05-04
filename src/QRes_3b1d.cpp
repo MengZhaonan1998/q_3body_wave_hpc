@@ -35,20 +35,20 @@ std::map<std::string, std::string> readopts(std::string filename)
 
 int main(int argc, char* argv[])
 {
-  MPI_Init(&argc, &argv);  // initialize mpi
-  int proc_rank;           // processor rank
-  int proc_numb;           // processor number
-  MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank); // get processor rank
-  MPI_Comm_size(MPI_COMM_WORLD, &proc_numb); // get processor number
+  MPI_Init(&argc, &argv);               // initialize mpi
+  int rank;                             // processor rank
+  int size;                             // processor number
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank); // get processor rank
+  MPI_Comm_size(MPI_COMM_WORLD, &size); // get processor number
 
   if (argc < 5){
     // number of grid points (+1): nR, nr
     // length of domain [-L,L]: LR, Lr
-    if (proc_rank==0) fprintf(stderr, "Usage %s <nR> <nr> <LR> <Lr>",argv[0]);
+    if (rank==0) fprintf(stderr, "Usage %s <nR> <nr> <LR> <Lr>",argv[0]);
     return 1;
   }
 
-  if (proc_rank==0)
+  if (rank==0)
   std::cout << "Welcome to QRes_3b1d!\n" 
 	    << "              -----------                      \n"
 	    << "---------     \\        /              ------- \n"
@@ -66,24 +66,35 @@ int main(int argc, char* argv[])
 
   //--- read options of Jacobi-Davidson algorithm ---//
   auto jdopts = readopts("jacobidavidsonOpts.txt"); 
+  
+  if (rank==0)
+  {
   std::cout << "Options of the Jacobi-Davidson algorithm are as follows:" << std::endl;
   for (const auto& [key, value] : jdopts)
 	  std::cout<< key << "=" << value << std::endl;
+  }
 
   //--- read options of GMRES algorithm ---//
   auto gmresopts = readopts("gmresOpts.txt"); 
+  
+  if (rank==0)
+  {
   std::cout << "Options of the GMRES algorithm are as follows:" << std::endl;
   for (const auto& [key, value] : gmresopts)
 	  std::cout<< key << "=" << value << std::endl;
+  }
 
   //--- Jacobi-Davidson eigensolver ---//
   auto result = JacobiDavidson(nR, nr, LR, Lr, jdopts, gmresopts);    // quadratic jacobi-davidson algorithm
   
-  MPI_Finalize();                          // finish mpi
+  MPI_Finalize();    // finish mpi
   
   //--- display the result including eigenvalues... ---//
+  if (rank==0)
+  {
   std::cout << "Eigenvalues detected:" << std::endl;
   for (int i=0; i<stoi(jdopts["numeigs"]); i++) std::cout<<result->eigval[i]<<std::endl;
- 
+  }
+
   return 0;
 }
