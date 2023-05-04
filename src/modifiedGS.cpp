@@ -16,7 +16,7 @@ void modifiedGS(std::complex<double>* V, int m, int n)
     for (k=j+1; k<n; k++)
     {
        vdot = complex_dot(m, V+j*m, V+k*m);
-       complex_axpby(m, -vdot, V+j*m, std::complex<double>(1.0,0.0), V+k*m);
+       axpby(m, -vdot, V+j*m, std::complex<double>(1.0,0.0), V+k*m);
     }
   }
 }

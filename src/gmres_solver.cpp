@@ -36,7 +36,7 @@ void arnoldi(int k, std::complex<double>* Q, std::complex<double>* h, QRes::Corr
   for (int i=0; i<=k; i++)
   {
     h[i] = complex_dot(n, Q+(k+1)*n, Q+i*n);
-    complex_axpby(n, -h[i], Q+i*n, 1.0, Q+(k+1)*n);
+    axpby(n, -h[i], Q+i*n, 1.0, Q+(k+1)*n);
   }
 
   h[k+1] = std::sqrt(complex_dot(n, Q+(k+1)*n, Q+(k+1)*n));
@@ -68,7 +68,7 @@ void gmres_solver(QRes::CorrectOp<std::complex<double>>* op, int n,
 
   // r=b-A*x
   op->apply(x,r);            // r = op * x
-  complex_axpby(n, 1.0, b, -1.0, r); // r = b - r
+  axpby(n, 1.0, b, -1.0, r); // r = b - r
 
   // compute the error
   r_norm = std::sqrt(complex_dot(n,r,r).real());
@@ -76,10 +76,10 @@ void gmres_solver(QRes::CorrectOp<std::complex<double>>* op, int n,
   double error = r_norm/b_norm;  // here I use the relative error instead of the residual norm
 
   // initialize the 1D vectors
-  complex_init(maxIter, sn, 0.0); 
-  complex_init(maxIter, cs, 0.0);
-  complex_init(maxIter+1, e1, 0.0);
-  complex_init(maxIter+1, beta, 0.0);
+  init(maxIter, sn, 0.0); 
+  init(maxIter, cs, 0.0);
+  init(maxIter+1, e1, 0.0);
+  init(maxIter+1, beta, 0.0);
   e1[0]=1.0;
   beta[0]=r_norm;
 
@@ -96,8 +96,8 @@ void gmres_solver(QRes::CorrectOp<std::complex<double>>* op, int n,
    * __                 __
    */
 
-  complex_init((maxIter+1) * n, Q, 0.0);
-  complex_init(((maxIter+1) * maxIter)/2+maxIter, H, 0.0);
+  init((maxIter+1) * n, Q, 0.0);
+  init(((maxIter+1) * maxIter)/2+maxIter, H, 0.0);
   for (int i=0;i<n;i++) Q[i]=r[i]/r_norm;  
 
   // start GMRES iteration
@@ -129,7 +129,7 @@ void gmres_solver(QRes::CorrectOp<std::complex<double>>* op, int n,
 
   // backward substitution
   std::complex<double>* y = new std::complex<double>[iter];
-  complex_init(iter, y, 0.0);
+  init(iter, y, 0.0);
   for (int i=0; i<iter; i++) 
   {
      for (int j=0; j<i; j++)
@@ -140,7 +140,7 @@ void gmres_solver(QRes::CorrectOp<std::complex<double>>* op, int n,
   }
 
   // x = x + Q*y
-  for (int i=0; i<iter; i++) complex_axpby(n, y[i], Q+i*n, 1.0, x);
+  for (int i=0; i<iter; i++) axpby(n, y[i], Q+i*n, 1.0, x);
 
   // return number of iterations and achieved residual (or should I return error=norm_r/norm_b ?)
   *resNorm = beta[iter].real();

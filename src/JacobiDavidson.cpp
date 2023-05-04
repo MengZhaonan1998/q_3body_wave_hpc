@@ -61,7 +61,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
   buildCmatrix(nr, Cr);       // C matrix (nr coordinate)
   buildMmatrix(nr, Mr);       // M matrix (nr coordinate)
   buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // (already checked)
-  complex_init(N, a0, 0.0);
+  init(N, a0, 0.0);
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
   QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	   
   QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
@@ -73,7 +73,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
   std::complex<double>* Cv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);       // tensor_C*V[:,i] -> Cv
   std::complex<double>* Mv = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);       // tensor_M*V[:,i] -> Mv
   std::complex<double>* vbest = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N);    // best Ritz vector
-  complex_init(N, V, 1.0/std::sqrt(N)); // initialize and normalize the first column of search space V
+  init(N, V, 1.0/std::sqrt(N)); // initialize and normalize the first column of search space V
   
   int iter = 0;     // iteration number
   int detected = 0; // number of eigenpairs found
@@ -160,15 +160,15 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
     for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idxBest)[i+Vdim];
 
     /* most promising Ritz vector (projected back) */
-    complex_init(N, vbest, 0.0);
-    for (int i=0; i<Vdim; i++) complex_axpby(N, cbest[i], V+i*N, 1.0, vbest); 
+    init(N, vbest, 0.0);
+    for (int i=0; i<Vdim; i++) axpby(N, cbest[i], V+i*N, 1.0, vbest); 
 
     /* residual */
     Coperator.apply(vbest, Cv);
     Moperator.apply(vbest, Mv);
     Koperator.apply(vbest, res);
-    complex_axpby(N, thetaBest, Cv, 1.0, res);
-    complex_axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
+    axpby(N, thetaBest, Cv, 1.0, res);
+    axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
     resNorm = std::sqrt(complex_dot(N, res, res).real());
     if (verbose==1) std::cout << "iteration " << iter << ", residual norm: " << resNorm;
     result_ptr->cvg_hist[iter] = resNorm;
@@ -185,15 +185,15 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
 
        thetaBest = proj_eigval[detected+1];
        idxBest = idx_eigen[detected+1];
-       complex_init(N, vbest, 0.0);
+       init(N, vbest, 0.0);
        for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idxBest)[i+Vdim];
-       for (int i=0; i<Vdim; i++) complex_axpby(N, cbest[i], V+i*N, 1.0, vbest); 
+       for (int i=0; i<Vdim; i++) axpby(N, cbest[i], V+i*N, 1.0, vbest); 
      
        Coperator.apply(vbest, Cv);
        Moperator.apply(vbest, Mv);
        Koperator.apply(vbest, res);
-       complex_axpby(N, thetaBest, Cv, 1.0, res);
-       complex_axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
+       axpby(N, thetaBest, Cv, 1.0, res);
+       axpby(N, thetaBest*thetaBest, Mv, 1.0, res);
 
        detected += 1;
     }
@@ -203,9 +203,9 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
     {	    
        for (int j=0; j<mindim; j++)
        {
-	  complex_init(N, v+j*N, 0.0);     
+	  init(N, v+j*N, 0.0);     
           for (int i=0; i<Vdim; i++) cbest[i] = linearEigSolv.eigenvectors().col(idx_eigen[j])[i+Vdim];
-          for (int i=0; i<Vdim; i++) complex_axpby(N, cbest[i], V+i*N, 1.0, v+j*N);  
+          for (int i=0; i<Vdim; i++) axpby(N, cbest[i], V+i*N, 1.0, v+j*N);  
        }
        vec_update(N*mindim, 1.0, v, V);
        if (detected != 0) vec_update(N*detected, 1.0, result_ptr->eigvec, V);
@@ -214,10 +214,10 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
      
     /* solve the (preconditioned) correction equation */
     Coperator.apply(vbest, z);
-    complex_axpby(N, 2.0*thetaBest, Mv, 1.0, z); 
+    axpby(N, 2.0*thetaBest, Mv, 1.0, z); 
     QRes::CorrectOp<std::complex<double>> correctOp(N, Koperator, Coperator, Moperator, vbest, z, thetaBest);  // linear operator of the correction equation
      
-    complex_init(N, t, 0.0);      // initial guess t0=zeros(N,1)
+    init(N, t, 0.0);      // initial guess t0=zeros(N,1)
     vec_update(N, -1.0, res, b);  // rhs b=-r
     gmres_solver(&correctOp, N, t, b, tol_gmres, maxiter_gmres, &resNorm_gmres, &numIter_gmres, verbose_gmres);
     std::cout << ", residual norm of gmres: "<< resNorm_gmres << std::endl;
