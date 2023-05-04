@@ -14,7 +14,7 @@
 #include <omp.h>
 #include <Eigen/Eigenvalues>
 #include <numeric>
-
+#include <mpi.h>
 
 
 
@@ -31,6 +31,7 @@ void buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12
 void buildKmatrix(int n, double L, std::complex<double> *K);
 void buildCmatrix(int n, std::complex<double>* C);
 void buildMmatrix(int n, std::complex<double>* M);
+void buildCmatrix_complex(int n, std::complex<double>* C);
 
 std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::map<std::string,std::string> jdopts, std::map<std::string, std::string> gmresopts);
 void modifiedGS(std::complex<double>* V, int m, int n);

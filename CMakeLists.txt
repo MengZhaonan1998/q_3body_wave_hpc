@@ -15,6 +15,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fopenmp")
 
 find_package(MPI REQUIRED)
 #include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+target_link_libraries(run_tests PUBLIC MPI::MPI_CXX)
 target_link_libraries(QRes_3b1d PUBLIC MPI::MPI_CXX)
+
 
 
