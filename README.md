@@ -1,2 +1,1 @@
-# q_3body_wave_hpc
-Computing resonant states of quantum mechanical three-body problems on supercomputers
+# QRes3b - a Parallel Nonlinear Eigensolver for Computing Resonant States of Quantum Mechanical Three-body Problems.
