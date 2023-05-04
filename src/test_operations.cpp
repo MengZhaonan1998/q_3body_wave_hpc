@@ -222,7 +222,7 @@ TEST(tensor_operations, correct_apply)
 
 }
 
-/*
+
 TEST(functions, gmres_solver)
 {
   int nR=3;
@@ -230,7 +230,16 @@ TEST(functions, gmres_solver)
   int N=16;
   double LR=1.0;
   double Lr=1.0;
-  std::complex<double> KR[N],CR[N],MR[N],Kr[N],Cr[N],Mr[N],Vp[N],a0[N],x[N],r[N];
+
+  int loc_n = domain_decomp(nR+1);
+  int loc_len = loc_n * (nr+1);
+
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  std::complex<double> KR[N],CR[N],MR[N],Kr[N],Cr[N],Mr[N],
+                       Vp[loc_len],a0[loc_len],x[loc_len],r[loc_len],vbest[loc_len],z[loc_len],b[loc_len];
   using namespace std::complex_literals; 
 
   buildKmatrix(nR, LR, KR);   // K matrix (nR coordinate)
@@ -241,37 +250,45 @@ TEST(functions, gmres_solver)
   buildMmatrix(nr, Mr);       // M matrix (nr coordinate)
   buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // (already checked)
   
-  init(N, a0, 0.0);
+  init(loc_len, a0, 0.0);
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
   QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	   
   QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
-  init(N,x, 0.0);
-  std::complex<double> vbest[N] = {0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
+  init(loc_len, x, 0.0);
+
+  std::complex<double> g_vbest[N] = {0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
 	      		           0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
 	      			   0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
 	     	 		   0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i};
-  std::complex<double> z[N] = {0.1287 - 0.2001i, -0.1555 - 0.1000i, -0.1555 - 0.1000i, 0.1287 - 0.2001i,
+  std::complex<double> g_z[N] = {0.1287 - 0.2001i, -0.1555 - 0.1000i, -0.1555 - 0.1000i, 0.1287 - 0.2001i,
 		              -0.1555 - 0.1000i, -0.4398 - 0.0000i, -0.4398 - 0.0000i,-0.1555 - 0.1000i,
 	 		      -0.1555 - 0.1000i, -0.4398 - 0.0000i, -0.4398 - 0.0000i,-0.1555 - 0.1000i,
 	  		       0.1287 - 0.2001i, -0.1555 - 0.1000i, -0.1555 - 0.1000i, 0.1287 - 0.2001i};
-  std::complex<double> b[N] = {-0.3592 - 0.1253i, 0.0018 - 0.0027i, 0.0018 - 0.0027i, -0.3592 - 0.1253i,
+  std::complex<double> g_b[N] = {-0.3592 - 0.1253i, 0.0018 - 0.0027i, 0.0018 - 0.0027i, -0.3592 - 0.1253i,
 	  		       -0.0097 + 0.0150i, 0.3671 + 0.1130i, 0.3671 + 0.1130i, -0.0097 + 0.0150i,
 	  		       -0.0097 + 0.0150i, 0.3671 + 0.1130i, 0.3671 + 0.1130i, -0.0097 + 0.0150i,
 	  		       -0.3592 - 0.1253i, 0.0018 - 0.0027i, 0.0018 - 0.0027i, -0.3592 - 0.1253i};
-  QRes::CorrectOp<std::complex<double>> correctOp(N, Koperator, Coperator, Moperator, vbest, z, 1.0000+1.5547i); 
+  for (int i=0; i<loc_len; i++)
+  {
+     vbest[i] = g_vbest[rank*loc_len +i];
+     z[i] = g_z[rank*loc_len +i];
+     b[i] = g_b[rank*loc_len +i];
+  }
+
+  QRes::CorrectOp<std::complex<double>> correctOp(loc_len, Koperator, Coperator, Moperator, vbest, z, 1.0000+1.5547i); 
 
   double resNorm;
   int numIter;
-  gmres_solver(&correctOp, N, x, b, 1e-8, 100, &resNorm, &numIter, 0);
+  gmres_solver(&correctOp, loc_len, x, b, 1e-8, 100, &resNorm, &numIter, 0);
   
   correctOp.apply(x,r);                    
   axpby(N, 1.0, b, -1.0, r); 
-  double err = std::sqrt(complex_dot(N,r,r).real())/std::sqrt(complex_dot(N,b,b).real());
-  
+
+  double err = std::sqrt(complex_dot(loc_len,r,r).real())/std::sqrt(complex_dot(loc_len,b,b).real());
   EXPECT_NEAR(1.0+err, 1.0, 10*std::numeric_limits<double>::epsilon());
 }
 
-
+/*
 TEST(functions, modified_gramschmidt)
 {
   using namespace std::complex_literals;
