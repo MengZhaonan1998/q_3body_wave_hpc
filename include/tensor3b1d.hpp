@@ -1,4 +1,5 @@
 #pragma once
+#include "header.hpp"
 #include "operations.hpp"
 
 namespace QRes
@@ -10,38 +11,82 @@ namespace QRes
       Kron2D(int m, ST* C_m, 
 	     int n, ST* D_n,
 	     ST* V, double a1, double a2):
-             C_(C_m), D_(D_n), V_(V), a1_(a1), a2_(a2), n_(n), m_(m){};
+             C_(C_m), D_(D_n), V_(V), a1_(a1), a2_(a2), n_(n), m_(m)
+      {
+        if (std::is_same<ST, float>::value)
+	   mpi_type = MPI_FLOAT;
+	else if (std::is_same<ST, double>::value)
+	   mpi_type = MPI_DOUBLE;	
+	else if (std::is_same<ST, std::complex<float>>::value)
+	   mpi_type = MPI_C_COMPLEX;
+        else if (std::is_same<ST, std::complex<double>>::value)
+	   mpi_type = MPI_C_DOUBLE_COMPLEX;	
+      
+        loc_m = domain_decomp(m_);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+//	MPI_Type_vector(loc_m, 1, n_, mpi_type, &column_type);
+//	MPI_Type_commit(&column_type);
+	
+      };
 
       // reshape operator
       // y = Op*x = reshape(a1*C*X+a2*X*D', n*m,1)
       void apply(const ST* v_in, ST* v_out) // to do...
       {
 
-	int i,j,k; 
+	int i,j,k;     
+
 	// V*w 
-	for (i=0; i<m_*n_; i++) v_out[i] = V_[i] * v_in[i]; 
-	
+	//for (i=0; i<m_*n_; i++) v_out[i] = V_[i] * v_in[i]; 	
+	for (i=0; i<loc_m*n_; i++) v_out[i] = V_[i] * v_in[i]; 	
+
+	/*
 	// a2*C2*W
 	for (i=0; i<m_; i++) 
           for (j=0; j<n_; j++) 
             for (k=0; k<n_; k++) 
 	      v_out[i*n_+j] += a2_ * D_[j*n_+k] * v_in[i*n_+k];
-       
-        // a1*W*C1^T
+	      // v_out[i*n_+j] += a2_ * dot(n_, D_+j*n_+k, v_in+i*n_+k);
+	
+	// a1*W*C1^T
 	for (i=0; i<m_; i++)
           for (j=0; j<n_; j++)
 	    for (k=0; k<m_; k++)
-	      v_out[i*n_+j] += a1_ * v_in[k*n_+j] * C_[i*m_+k];   
+	      v_out[i*n_+j] += a1_ * v_in[k*n_+j] * C_[i*m_+k];    
+              // axpby(n_, a1_ * C_[i*m_+k], v_in+k*n_, 1.0, v_out+i*n_); 
+	*/
+   
+        // non-blocking allgather operation 
+        ST* vcol = new ST[m_*n_];
+        init(m_, vcol, 0.0);
+	MPI_Request request;
+        MPI_Iallgather(v_in, loc_m*n_, mpi_type, vcol, loc_m*n_, mpi_type, MPI_COMM_WORLD, &request);
+        
+        for (i=0; i<loc_m; i++)
+          for (j=0; j<n_; j++)
+	    for (k=0; k<n_; k++)
+               v_out[i*n_+j] += a2_ * v_in[i*n_+k] * D_[j*n_+k];
+	
+	MPI_Wait(&request, MPI_STATUS_IGNORE);
+        //for (k=0; k<m_*n_; k++) std::cout << "vcol["<< k<<"]="<<vcol[k]<<std::endl;
 
+	for (i=0; i<loc_m; i++)
+          for (j=0; j<n_; j++)
+	    for (k=0; k<m_; k++)
+	      v_out[i*n_+j] += a1_ * vcol[k*n_+j] * C_[(rank*loc_m+i)*m_+k];    
+
+	delete [] vcol;
         return;
       }
 
     private:
-      int n_, m_;
+      int n_, m_, loc_m, rank;
       ST a1_, a2_;
       ST* C_;
       ST* D_;
       ST* V_;
+      MPI_Datatype mpi_type;
+      //MPI_Datatype column_type;
   };
 
   template<typename ST>
@@ -57,26 +102,43 @@ namespace QRes
       int N_; 
       void apply(const ST* v_in, ST* v_out)
       {
+        int rank, size;
+        MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
         std::complex<double>* vtemp1 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N_);
 	std::complex<double>* vtemp2 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N_);
 	std::complex<double> dux,duy,duw;
-
 	dux = complex_dot(N_, u_, v_in);            // u'*v_in
+
 	vec_update(N_, 1.0, v_in, vtemp1);          // vtemp = v_in
-	complex_axpby(N_, -dux, u_, 1.0, vtemp1);   // vtemp = v_out - dux*u
-        
-	/* v_out = tensorapply(K,vtemp1) + 
-	 *   theta*tensorapply(C,vtemp1) + 
-	 *   theta*theta*tensorapply(M,vtemp1) */
-	Kop_.apply(vtemp1, v_out);                  
-	Cop_.apply(vtemp1, vtemp2); 
-	complex_axpby(N_, theta_, vtemp2, 1.0, v_out);
-	Mop_.apply(vtemp1, vtemp2);
-	complex_axpby(N_, theta_*theta_, vtemp2, 1.0, v_out);
+	axpby(N_, -dux, u_, 1.0, vtemp1);   // vtemp = v_out - dux*u
+      
+	// v_temp2 = tensorapply(K,vtemp1) + 
+	//   theta*tensorapply(C,vtemp1) + 
+	//   theta*theta*tensorapply(M,vtemp1) 
+	Kop_.apply(vtemp1, v_out);
+        vec_update(N_, 1.0, v_out, vtemp2);
 	
-	duy = complex_dot(N_, u_, v_out);            // duy = u'*v_out
-	duw = complex_dot(N_, u_, w_);               // duw = u'*w
-        complex_axpby(N_, -duy/duw, w_, 1.0, v_out); // v_out = v_out - (duy/duw)*w
+	Cop_.apply(vtemp1, v_out);    // Problem!
+	axpby(N_, theta_, v_out, 1.0, vtemp2);
+
+	Mop_.apply(vtemp1, v_out);
+	axpby(N_, theta_*theta_, v_out, 1.0, vtemp2);
+
+	duy = complex_dot(N_, u_, vtemp2);        // duy = u'*v_out
+	duw = complex_dot(N_, u_, w_);            // duw = u'*w
+        axpby(N_, -duy/duw, w_, 1.0, vtemp2);     // vtemp2 = vtemp2 - (duy/duw)*w
+
+        vec_update(N_, 1.0, vtemp2, v_out);
+    
+	/*
+        for (int i=0; i<size; i++)
+        {if (rank==i){
+           std::cout<<"------rank "<<rank << "--------"<<std::endl;
+           for (int i=0;i<N_;i++)std::cout<<v_out[i]<<std::endl;
+           std::cout<<"----------------------------------"<<std::endl;
+        }}*/
 
 	free(vtemp1); free(vtemp2);
 	return;
@@ -92,3 +154,5 @@ namespace QRes
   };
 
 }
+
+
