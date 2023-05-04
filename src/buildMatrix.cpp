@@ -80,15 +80,21 @@ void buildGaussianPotential3b1d(int nR, int nr, double LR, double Lr, double V12
   // array of Gaussian potential of 3body 1d problem
   // R->i r->j
 
-  int i,j;
+  int i,j,rank,size,loc_n,loc_len;
   double val_a, val_b, val_c;
   double* xChebR = new double[nR+1];
   double* xChebr = new double[nr+1];
-  for (i=0; i<=nR; i++) xChebR[i] = LR*cos(M_PI * i / nR); 
-  for (j=0; j<=nr; j++) xChebr[j] = Lr*cos(M_PI * j / nr);
+  
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  loc_n = domain_decomp(nR+1);
+  loc_len = loc_n * nr;
 
-  for (i=0; i<=nR; i++)
-    for (j=0; j<=nr; j++)
+  for (i=0; i<nR+1; i++) xChebR[i] = LR*cos(M_PI * (i+rank*loc_n) / nR); 
+  for (j=0; j<nr+1; j++) xChebr[j] = Lr*cos(M_PI * j / nr);
+
+  for (i=0; i<loc_n; i++)
+    for (j=0; j<nr+1; j++)
     {
       val_a = pow(xChebR[i],2);
       val_b = 0.25 * pow(xChebR[i],2) + pow(xChebr[j],2) + xChebR[i]*xChebr[j];
@@ -134,6 +140,21 @@ void buildCmatrix(int n, std::complex<double>* C)
       C[i]=std::complex<double>(0.0,0.0);
    C[0] = std::complex<double>(1.0,0.0);
    C[(n+1)*(n+1)-1] = std::complex<double>(1.0,0.0);
+
+   return;
+}
+
+
+void buildCmatrix_complex(int n, std::complex<double>* C)
+{
+   // Note that C matrix is very sparse
+   // but here we still store it as a dense matrix
+   // We will improve this later
+
+   for (int i=0; i<(n+1)*(n+1); i++)
+      C[i]=std::complex<double>(0.0,0.0);
+   C[0] = std::complex<double>(0.0,1.0);
+   C[(n+1)*(n+1)-1] = std::complex<double>(0.0,1.0);
 
    return;
 }
