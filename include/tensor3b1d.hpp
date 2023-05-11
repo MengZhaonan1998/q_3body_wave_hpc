@@ -35,9 +35,11 @@ namespace QRes
       {
 
 	int i,j,k;     
+	ST ele;
 
 	// V*w 
 	//for (i=0; i<m_*n_; i++) v_out[i] = V_[i] * v_in[i]; 	
+        #pragma omp parallel for
 	for (i=0; i<loc_m*n_; i++) v_out[i] = V_[i] * v_in[i]; 	
 
 	/*
@@ -61,22 +63,38 @@ namespace QRes
         init(m_, vcol, 0.0);
 	MPI_Request request;
         MPI_Iallgather(v_in, loc_m*n_, mpi_type, vcol, loc_m*n_, mpi_type, MPI_COMM_WORLD, &request);
-        
+
+        #pragma omp declare reduction(+: ST: omp_out += omp_in) initializer (omp_priv = omp_orig)	
+        #pragma omp parallel for reduction(+:ele)
         for (i=0; i<loc_m; i++)
           for (j=0; j<n_; j++)
 	    for (k=0; k<n_; k++)
-               v_out[i*n_+j] += a2_ * v_in[i*n_+k] * D_[j*n_+k];
-	
+	    {
+	       ele =  a2_ * v_in[i*n_+k] * D_[j*n_+k];
+               v_out[i*n_+j] += ele;
+	    }
+
 	MPI_Wait(&request, MPI_STATUS_IGNORE);
         //for (k=0; k<m_*n_; k++) std::cout << "vcol["<< k<<"]="<<vcol[k]<<std::endl;
 
+        #pragma omp parallel for reduction(+:ele)
 	for (i=0; i<loc_m; i++)
           for (j=0; j<n_; j++)
 	    for (k=0; k<m_; k++)
-	      v_out[i*n_+j] += a1_ * vcol[k*n_+j] * C_[(rank*loc_m+i)*m_+k];    
+	    {
+              ele = a1_ * vcol[k*n_+j] * C_[(rank*loc_m+i)*m_+k]; 
+	      v_out[i*n_+j] += ele;    
+	    }
 
 	delete [] vcol;
         return;
+      }
+
+      // approximate inverse operation, y = Op\b
+      // The operation is intended as a preconditioner and may not give the exact solution.
+      void invapply(const ST* b, ST* v_out)
+      {
+        int i, j, k;
       }
 
     private:
