@@ -4,9 +4,6 @@
 #include "operations.hpp"
 #include "tensor3b1d.hpp"
 #include "gmres_solver.hpp"
-#include <iostream>
-
-
 
 int main(int argc, char **argv)
 {
