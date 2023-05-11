@@ -221,6 +221,7 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
        if (detected != 0) vec_update(loc_N*detected, 1.0, result_ptr->eigvec, V);
        Vdim = mindim;
     }
+
     MPI_Barrier(MPI_COMM_WORLD);  // synchronization
 
     /* solve the (preconditioned) correction equation */

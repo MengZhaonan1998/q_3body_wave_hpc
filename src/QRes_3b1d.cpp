@@ -85,16 +85,21 @@ int main(int argc, char* argv[])
   }
 
   //--- Jacobi-Davidson eigensolver ---//
-  auto result = JacobiDavidson(nR, nr, LR, Lr, jdopts, gmresopts);    // quadratic jacobi-davidson algorithm
+  { Timer t("JacobiDavidson");
+    auto result = JacobiDavidson(nR, nr, LR, Lr, jdopts, gmresopts);    // quadratic jacobi-davidson algorithm
   
   MPI_Finalize();    // finish mpi
-  
+
   //--- display the result including eigenvalues... ---//
   if (rank==0)
   {
   std::cout << "Eigenvalues detected:" << std::endl;
   for (int i=0; i<stoi(jdopts["numeigs"]); i++) std::cout<<result->eigval[i]<<std::endl;
   }
+
+  }
+  if (rank==0)
+  Timer::summarize();
 
   return 0;
 }
