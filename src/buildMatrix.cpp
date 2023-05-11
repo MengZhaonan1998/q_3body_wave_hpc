@@ -1,10 +1,7 @@
 #define _USE_MATH_DEFINES
 
-#include <cmath>
 #include "header.hpp"
 #include "operations.hpp"
-
-#include <iostream>
 
 void ChebyshevDiffMatrix(int n, double L, double *ChebD1){
    // Chebyshev differentiation matrix D_N
