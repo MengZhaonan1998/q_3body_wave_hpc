@@ -3,7 +3,6 @@
 #include "operations.hpp"
 #include "tensor3b1d.hpp"
 #include "gmres_solver.hpp"
-#include <iostream>
 
 TEST(operations, init)
 {
@@ -126,46 +125,47 @@ TEST(tensor_operations, tensor_apply)
   
   // test only for one or two processors
   if (size==1)
-  {
-     double V[6]={1,2,3,6,3,2};   // Potential matrix/or vector
-     double v_in[6]={1,2,1,3,0,4};
-     double v_out[6];
-     double result[6] = {17, 16, 23, 46, 24, 47}; 
-     double C1[4]={1,2,1,3};            // C1 m=2
-     double C2[9]={2,2,3,2,2,4,2,2,5};  // C2 n=3
-     QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
+  { 
+     std::complex<double> V[6]={1,2,3,6,3,2};   // Potential matrix/or vector
+     std::complex<double> v_in[6]={1,2,1,3,0,4};
+     std::complex<double> v_out[6];
+     std::complex<double> result[6] = {17, 16, 23, 46, 24, 47}; 
+     std::complex<double> C1[4]={1,2,1,3};            // C1 m=2
+     std::complex<double> C2[9]={2,2,3,2,2,4,2,2,5};  // C2 n=3
+     QRes::Kron2D<std::complex<double>> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
      Koperator.apply(v_in, v_out);
      double err=0.0;
-     for (int i=0; i<6; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
+     for (int i=0; i<6; i++) err = std::max(err, std::max(err, std::abs(result[i].real()-v_out[i].real())));
+     EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
   }
   else
   {
-     double v_in[3];
-     double V[3];
-     double result[3];
-     double v_out[3];
-     double C1[4]={1,2,1,3};            // C1 m=2
-     double C2[9]={2,2,3,2,2,4,2,2,5};  // C2 n=3
+     std::complex<double> v_in[3];
+     std::complex<double> V[3];
+     std::complex<double> result[3];
+     std::complex<double> v_out[3];
+     std::complex<double> C1[4]={1,2,1,3};            // C1 m=2
+     std::complex<double> C2[9]={2,2,3,2,2,4,2,2,5};  // C2 n=3
      if (rank==0)
      {
-        double V[3] = {1,2,3}; 
-        double v_in[3] = {1,2,1};
-        double result[3] = {17, 16, 23};
-        QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
+	std::complex<double> V[3] = {1,2,3}; 
+	std::complex<double> v_in[3] = {1,2,1};
+        std::complex<double> result[3] = {17, 16, 23};
+        QRes::Kron2D<std::complex<double>> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
         Koperator.apply(v_in, v_out);
         double err=0.0;	
-        for (int i=0; i<3; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
+        for (int i=0; i<3; i++) err = std::max(err, std::max(err, std::abs(result[i].real()-v_out[i].real())));
         EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
      }
      else
      {
-        double V[3] = {6,3,2};
-        double v_in[3] = {3,0,4};
-        double result[3] = {46, 24, 47};
-        QRes::Kron2D<double> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
+        std::complex<double> V[3] = {6,3,2};
+        std::complex<double> v_in[3] = {3,0,4};
+        std::complex<double> result[3] = {46, 24, 47};
+        QRes::Kron2D<std::complex<double>> Koperator(2, C1, 3, C2, V, 1.0, 1.0);
         Koperator.apply(v_in, v_out);
         double err=0.0;
-        for (int i=0; i<3; i++) err = std::max(err, std::max(err, std::abs(result[i]-v_out[i])));
+        for (int i=0; i<3; i++) err = std::max(err, std::max(err, std::abs(result[i].real()-v_out[i].real())));
         EXPECT_NEAR(1.0+err, 1.0, std::numeric_limits<double>::epsilon());  
      }
   }
@@ -409,7 +409,7 @@ TEST(buildoperator, Kmatrix)
   0.4764,   -1.1056,  1.8472,  -6.3416,  15.7666, -10.6430,
   -0.5000,    1.1056, -1.5279,   2.8944, -10.4721,  8.5000};
   
-   double err = 0.0;
+  double err = 0.0;
   for (int i=0; i<(n+1)*(n+1); i++)
       err = std::max(err, std::max(err, std::abs(K[i]-true_K[i])));
 
@@ -418,5 +418,19 @@ TEST(buildoperator, Kmatrix)
 }
 
 
+TEST(numericallibrary, schur)
+{
+  int n = 256;
+  Eigen::MatrixXd A = Eigen::MatrixXd::Random(n,n);
+  Eigen::RealSchur<Eigen::MatrixXd> schur(A);
+  Eigen::MatrixXd U = schur.matrixU();
+  Eigen::MatrixXd T = schur.matrixT();
+  Eigen::MatrixXd B = U*T*U.transpose();
 
+  double err=0.0;
+  for (int i=0; i<n; i++)
+     for (int j=0; j<n; j++)
+	err = std::max(err, std::abs(A(i,j)-B(i,j)));
+  EXPECT_NEAR(1.0+err, 1.0, n*std::numeric_limits<double>::epsilon());  
+}
 
