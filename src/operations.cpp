@@ -44,7 +44,7 @@ std::complex<double> complex_dot(int n, std::complex<double> const* x, std::comp
 {
   std::complex<double> local_res(0.0,0.0);
   std::complex<double> global_res;
-  #pragma omp declare reduction(+: std::complex<double>: omp_out += omp_in) initializer (omp_priv = omp_orig)
+  #pragma omp declare reduction(+: std::complex<double>: omp_out += omp_in) initializer (omp_priv = omp_orig)  
   #pragma omp parallel for reduction(+:local_res)
   for (int i=0; i<n; i++)
      local_res += std::conj(x[i]) * y[i];
