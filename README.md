@@ -1,28 +1,19 @@
 # QRes3b 
 ## A Parallel Nonlinear Eigensolver for Computing Resonant States of Quantum Mechanical Three-body Problems
 ### What is QRes3b?
-<<<<<<< HEAD
-QRes3b aims at computing resonant states of 1-dimensional quantum mechanical three-body problems. A quantum two/three-body system can be described by a very well-known equation in the quantum world - the Schrödinger equation. In a two-body system, the interaction between two quantum particles conforms to the stationary Schrödinger equation:Cancel changes
-$$H\psi=E\psi,$$
-where the Hamiltonian operator $H$ is given by 
-$$H = -\frac{1}{2}\Delta(x) + V(x).$$
-For simplicity we omit the physical constants such as the Planck's constant in the equation. To extract the resonant states from the above eigenvalue problem, one needs to impose some proper boundary conditions (for more details about resonances please refer to https://www.cs.cornell.edu/~bindel/cims/resonant1d/theo2.html):  
-=======
 QRes3b aims at computing resonant states of a quantum mechanical three-body problems. A quantum two/three-body system can be described by a very well-known equation in the quantum world - the Schrödinger equation. In a two-body system, the interaction between two quantum particles conforms to the stationary Schrödinger equation:
 $$H\psi=E\psi.$$
 The Hamiltonian operator $H$ is given by 
 $$H = -\frac{1}{2}\Delta(x) + V(x),$$
 where $x$ denotes the distance between two particles. For simplicity we omit the physical constants such as the Planck's constant in the equation. To extract the resonant states from the above eigenvalue problem, one needs to impose some proper boundary conditions (for more details about resonances please refer to https://www.cs.cornell.edu/~bindel/cims/resonant1d/theo2.html):
 $$E=\frac{1}{2}k^2,$$
->>>>>>> 5b8dec96534a02b744afe97a10da696f4b33d518
 $$(\partial_x-ik)\psi(x)=0 \ at \ x=-L,$$ 
 $$(\partial_x+ik)\psi(x)=0 \ at \ x=L.$$
 The pseudo-spectral discretization of the eigenvalue problem with above boundary conditions leads to a nonlinear(quadratic) eigenvalue problem represented by matrix
 $$(K+kC+k^2M)\psi=0.$$
-<<<<<<< HEAD
+
 QRes3b implements a parallel iterative eigensolver based on the Jacobi-Davidson algorithm for solving the above quadratic eigenvalue problem. The algorithm follows the "MPI+OpenMP" programming model, where MPI takes care of data communication between processes (distributed memory), and OpenMP leverages multi-core computation within shared memory.
 
-=======
 For a three-body (two heavy + one light) problem, we assume there is no interaction between two heavy particles and introduce another coordinate $y$ to represent the relative coordinate between the two heavy particles:
 $$[-\frac{\alpha_x}{2}\Delta(x) - \frac{\alpha_y}{2}\Delta(y) + V(x,y)]\psi(x,y)=E\psi(x,y),$$
 where x denotes the coordinate of the light particle with respect to the center of mass of the two heavy particles. The discretization of this two-dimensional eigenvalue problem with above outgoing boundary conditions is similar with the case of the two-body system. The only thing which involves more efforts is to compute the Kronecker product:
@@ -41,6 +32,4 @@ where the reshape operation is used to interpret the resulting $N_2\times N_1$-m
 3. Whenever a gather operation is finished for a local column of $W^T$, apply $C_1$ to that column;
 4. The back transpose is then overlapped with the computation of $C_2 W$.
 
-
->>>>>>> 5b8dec96534a02b744afe97a10da696f4b33d518
 ### Trying it out
