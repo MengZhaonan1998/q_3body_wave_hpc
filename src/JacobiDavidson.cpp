@@ -4,7 +4,7 @@
 #include "operations.hpp"
 #include "gmres_solver.hpp"
 
-std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
+std::unique_ptr<resultJD> JacobiDavidson(std::map<std::string, std::string> b3d1opts,
 		                         std::map<std::string, std::string> jdopts,
 					 std::map<std::string, std::string> gmresopts)
 {
@@ -14,7 +14,13 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);   // get processor rank
   MPI_Comm_size(MPI_COMM_WORLD, &size);   // get processor number
 
-  //--- some settings for JacobiDavidson ---//
+  //--- get settings for 3b1d problem ---//
+  int nR = stoi(b3d1opts["nR"]);          // number of grid points on R
+  int nr = stoi(b3d1opts["nr"]);          // number of grid points on r
+  double LR = stod(b3d1opts["LR"]);       // R cutoff 
+  double Lr = stod(b3d1opts["Lr"]);       // r cutoff
+
+  //--- get settings for JacobiDavidson ---//
   int numeigs = stoi(jdopts["numeigs"]);        // number of eigenvalues desired
   int mindim  = stoi(jdopts["mindim"]);         // minimum dimension of search space V
   int maxdim  = stoi(jdopts["maxdim"]);         // maximum dimension of search space V
@@ -23,11 +29,11 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
   double tolerance = stod(jdopts["tolerance"]); // tolerance of residual norm
   std::complex<double> sigma(stod(jdopts["target_real"]),stod(jdopts["target_imag"])); // target (shift) (complex)
   
-  //--- some settings for GMRES ---//
+  //--- get settings for GMRES ---//
   int numIter_gmres;
-  int maxiter_gmres= stoi(gmresopts["maxiter"]); 
-  int verbose_gmres =stoi(gmresopts["verbose"]);
-  double tol_gmres = stod(gmresopts["tolerance"]); 
+  int maxiter_gmres= stoi(gmresopts["maxiter"]);   // maximum iterations of GMRES
+  int verbose_gmres =stoi(gmresopts["verbose"]);   // output or not
+  double tol_gmres = stod(gmresopts["tolerance"]); // tolerance of GMRES
   double resNorm_gmres;
 
   //--- domain decomposition ---// 
@@ -44,11 +50,9 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
   //--- memory allocation ---//  
   std::complex<double>* KR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* CR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
-  std::complex<double>* MR = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nR+1));
   std::complex<double>* Kr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
   std::complex<double>* Cr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
-  std::complex<double>* Mr = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nr+1)*(nr+1));
-  std::complex<double>* Vp = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
+  std::complex<double>* Vp = (std::complex<double>*)malloc(sizeof(std::complex<double>)*(nR+1)*(nr+1));
   std::complex<double>* a0 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
   std::complex<double>* res= (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
   std::complex<double>* z = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N);
@@ -56,19 +60,29 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
   std::complex<double>* b = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N); 
   double resNorm;
 
-  //--- build tensor operator ---//
+  //--- build stiffness, damping and mass operator ---//
   buildKmatrix(nR, LR, KR);           // K matrix (nR coordinate) 
   buildKmatrix(nr, Lr, Kr);           // K matrix (nr coordinate)
-  buildMmatrix(nR, MR);               // M matrix (nR coordinate)
-  buildMmatrix(nr, Mr);               // M matrix (nr coordinate)
   buildCmatrix_complex(nR, CR);       // C matrix (nR coordinate) 
   buildCmatrix_complex(nr, Cr);       // C matrix (nr coordinate)
-  buildGaussianPotential3b1d(nR, nr, LR, Lr, 1.0, 1.0, 1.0, Vp);  // Gaussian potential (already checked)
+ 
+  if (b3d1opts["pot"]=="G")
+  {
+   double V12 = stod(b3d1opts["V12"]);
+   double V13 = stod(b3d1opts["V13"]);
+   double V23 = stod(b3d1opts["V23"]);
+   buildGaussianPotential3b1d(nR, nr, LR, Lr, V12, V13, V23, Vp);  // Gaussian potential (already checked)
+  }
+  else
+  {
+   std::cout << "only gaussian potential is supported so far ..." << std::endl;
+  }
+
   init(loc_N, a0, 0.0);
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
-  QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	   
-  QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
-	   
+  QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	    
+  QRes::DiagOp<std::complex<double>> Moperator(loc_N, -0.5);                      // M diagonal operator
+
   //--- search space V (stored by column major!) ---//
   std::complex<double>* V = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N*maxdim); // search space V (N*maxdim)
   std::complex<double>* v = (std::complex<double>*)malloc(sizeof(std::complex<double>)*loc_N*mindim); // minor-search space v (N*mindim) used to store space vectors temporarily
@@ -242,8 +256,8 @@ std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,
     iter += 1;   // iteration +1
   }
 
-  free(KR); free(CR); free(MR);
-  free(Kr); free(Cr); free(Mr);
+  free(KR); free(CR); 
+  free(Kr); free(Cr); 
   free(Vp); free(a0); free(res);
   free(V); free(Kv); free(Cv); free(Mv); free(vbest);
   free(z); free(t); free(b);

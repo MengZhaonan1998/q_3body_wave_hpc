@@ -40,30 +40,31 @@ int main(int argc, char* argv[])
   int size;                             // processor number
   MPI_Comm_rank(MPI_COMM_WORLD, &rank); // get processor rank
   MPI_Comm_size(MPI_COMM_WORLD, &size); // get processor number
-
+  /*
   if (argc < 5){
     // number of grid points (+1): nR, nr
     // length of domain [-L,L]: LR, Lr
     if (rank==0) fprintf(stderr, "Usage %s <nR> <nr> <LR> <Lr>",argv[0]);
     return 1;
   }
-
+  */
   if (rank==0)
   std::cout << "Welcome to QRes_3b1d!\n" 
-	    << "              -----------                      \n"
-	    << "---------     \\        /              ------- \n"
+	    << "               -----------                      \n"
+	    << "---------      \\        /              ------- \n"
 	    << "\\      /-------\\      /---------------\\    / \n"             
             << " \\    /---------\\    /-----------------\\  /  \n"
 	    << "  \\  /           \\  /                   \\/   \n"
 	    << "   \\/             \\/                          \n"
 	    << "This program aims at computing resonances of a quantum three body problem in parallel.\n" << std::endl;
- 
+  /*
   int nR = atoi(argv[1]);    // x grid size
   int nr = atoi(argv[2]);    // y grid size
   double LR = atoi(argv[3]); // x domain length
   double Lr = atoi(argv[4]); // y domain length
   if (nR <= 2 || nr <= 2) throw std::runtime_error("need at least two grid points in each dimension to implement boundary conditions");
-
+  */
+  
   //--- read options of Jacobi-Davidson algorithm ---//
   auto jdopts = readopts("jacobidavidsonOpts.txt"); 
   
@@ -73,6 +74,17 @@ int main(int argc, char* argv[])
   for (const auto& [key, value] : jdopts)
 	  std::cout<< key << "=" << value << std::endl;
   }
+
+  //--- read options of 3b1d problem ---//
+  auto b3d1opts = readopts("b3d1Opts.txt"); 
+  
+  if (rank==0)
+  {
+  std::cout << "Options of the 3b1d problem are as follows:" << std::endl;
+  for (const auto& [key, value] : b3d1opts)
+	  std::cout<< key << "=" << value << std::endl;
+  }
+  //std::map<std::string, std::string> b3d1opts{{"nR","5"},{"nr","5"},{"LR","5"},{"Lr","5"},{"pot","G"},{"V12","1"},{"V13","1"},{"V23","1"}};
 
   //--- read options of GMRES algorithm ---//
   auto gmresopts = readopts("gmresOpts.txt"); 
@@ -86,7 +98,7 @@ int main(int argc, char* argv[])
 
   //--- Jacobi-Davidson eigensolver ---//
   { Timer t("JacobiDavidson");
-    auto result = JacobiDavidson(nR, nr, LR, Lr, jdopts, gmresopts);    // quadratic jacobi-davidson algorithm
+    auto result = JacobiDavidson(b3d1opts, jdopts, gmresopts);    // quadratic jacobi-davidson algorithm
   
   MPI_Finalize();    // finish mpi
 
