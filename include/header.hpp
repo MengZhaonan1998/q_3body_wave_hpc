@@ -33,7 +33,7 @@ void buildCmatrix(int n, std::complex<double>* C);
 void buildMmatrix(int n, std::complex<double>* M);
 void buildCmatrix_complex(int n, std::complex<double>* C);
 
-std::unique_ptr<resultJD> JacobiDavidson(int nR,int nr,double LR,double Lr,std::map<std::string,std::string> jdopts, std::map<std::string, std::string> gmresopts);
+std::unique_ptr<resultJD> JacobiDavidson(std::map<std::string,std::string> b3d1opts, std::map<std::string,std::string> jdopts, std::map<std::string, std::string> gmresopts);
 void modifiedGS(std::complex<double>* V, int m, int n);
 
 
