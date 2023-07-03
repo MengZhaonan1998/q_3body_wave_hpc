@@ -108,12 +108,27 @@ namespace QRes
   };
 
   template<typename ST>
+  class DiagOp{
+    public:
+      DiagOp(int N, ST entry): N_(N), entry_(entry){};
+      void apply(const ST* v_in, ST* v_out)
+      {
+        vec_update(N_, entry_, v_in, v_out);
+        return;
+      }
+    
+    private:
+      ST entry_;
+      int N_;
+  }; 
+
+  template<typename ST>
   class CorrectOp{
     public:
       CorrectOp(int N, 
 		QRes::Kron2D<ST> Koperator, 
 		QRes::Kron2D<ST> Coperator,
-		QRes::Kron2D<ST> Moperator,
+		QRes::DiagOp<ST> Moperator,
 		ST* u, ST* w, ST theta):
 	  N_(N), Kop_(Koperator), Cop_(Coperator), Mop_(Moperator),
 	  u_(u), w_(w), theta_(theta){};
@@ -165,12 +180,11 @@ namespace QRes
     private:
       QRes::Kron2D<ST> Kop_;
       QRes::Kron2D<ST> Cop_;
-      QRes::Kron2D<ST> Mop_;
+      QRes::DiagOp<ST> Mop_;
       ST* u_;
       ST* w_;
       ST theta_;
   };
-
 }
 
 
