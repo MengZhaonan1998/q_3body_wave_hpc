@@ -7,5 +7,5 @@ tolerance:1e-5
 maxiter:100
 verbose:1
 lsolver:gmres
-precond:lu
+precond:1
 
