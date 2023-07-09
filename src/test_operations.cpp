@@ -203,12 +203,14 @@ TEST(tensor_operations, correct_apply)
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
   QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator
   QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
+  QRes::DiagOp<std::complex<double>> MdiagOp((nR+1)*(nr+1), -0.5);                // M diagonal operator
+
   init(loc_len,v_in, 1.0);
   init(loc_len,v_out, 3.1);  // initialize v_out randomly to check the pointer safety
   init(loc_len,vbest, 0.1);
   init(loc_len,z, 1.0);
 
-  QRes::CorrectOp<std::complex<double>> correctOp(loc_len, Koperator, Coperator, Moperator, vbest, z, 3.0);
+  QRes::CorrectOp_sub<std::complex<double>> correctOp(loc_len, Koperator, Coperator, MdiagOp, Moperator, vbest, z, 3.0);
   correctOp.apply(v_in, v_out);
 
   std::complex<double> result[N] = {6.6834, -0.0229, -0.0229, 6.6834, 0.1263, -6.7868, -6.7868, 0.1263,
@@ -254,6 +256,7 @@ TEST(functions, gmres_solver)
   QRes::Kron2D<std::complex<double>> Koperator(nR+1, KR, nr+1, Kr, Vp, 1.0, 1.0); // K tensor operator
   QRes::Kron2D<std::complex<double>> Coperator(nR+1, CR, nr+1, Cr, a0, 1.0, 1.0); // C tensor operator	   
   QRes::Kron2D<std::complex<double>> Moperator(nR+1, MR, nr+1, Mr, a0, 1.0, 1.0); // M tensor operator
+  QRes::DiagOp<std::complex<double>> MdiagOp((nR+1)*(nr+1), -0.5);                // M diagonal operator
   init(loc_len, x, 0.0);
 
   std::complex<double> g_vbest[N] = {0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i, 0.0644 - 0.1000i,
@@ -275,7 +278,7 @@ TEST(functions, gmres_solver)
      b[i] = g_b[rank*loc_len +i];
   }
 
-  QRes::CorrectOp<std::complex<double>> correctOp(loc_len, Koperator, Coperator, Moperator, vbest, z, 1.0000+1.5547i); 
+  QRes::CorrectOp_sub<std::complex<double>> correctOp(loc_len, Koperator, Coperator, MdiagOp, Moperator, vbest, z, 1.0000+1.5547i); 
 
   double resNorm;
   int numIter;

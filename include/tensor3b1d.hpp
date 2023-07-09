@@ -133,7 +133,7 @@ namespace QRes
 	  N_(N), Kop_(Koperator), Cop_(Coperator), Mop_(Moperator),
 	  u_(u), w_(w), theta_(theta){};
       int N_; 
-      void apply(const ST* v_in, ST* v_out)
+      virtual void apply(const ST* v_in, ST* v_out)
       {
         int rank, size;
         MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -185,6 +185,82 @@ namespace QRes
       ST* w_;
       ST theta_;
   };
+
+ /* template<typename ST>
+  class CorrectOp_sub : public CorrectOp{
+    public:
+      CorrectOp_sub()
+    private:
+      QRes::Kron2D<ST> Mop_sub;
+  };*/
+
+  template<typename ST>
+  class CorrectOp_sub : public QRes::CorrectOp<ST> {
+    public:
+      CorrectOp_sub(int N, 
+		QRes::Kron2D<ST> Koperator, 
+		QRes::Kron2D<ST> Coperator,
+		QRes::DiagOp<ST> MdiagOp,
+		QRes::Kron2D<ST> Moperator,
+		ST* u, ST* w, ST theta):
+                QRes::CorrectOp<ST>(N, Koperator, Coperator, MdiagOp, u, w, theta),
+	        N_(N), Kop_(Koperator), Cop_(Coperator), Mop_(Moperator),
+	        u_(u), w_(w), theta_(theta) {};
+      int N_; 
+      void apply(const ST* v_in, ST* v_out)
+      {
+        int rank, size;
+        MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+        std::complex<double>* vtemp1 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N_);
+	std::complex<double>* vtemp2 = (std::complex<double>*)malloc(sizeof(std::complex<double>)*N_);
+	std::complex<double> dux,duy,duw;
+	dux = complex_dot(N_, u_, v_in);            // u'*v_in
+
+	vec_update(N_, 1.0, v_in, vtemp1);          // vtemp = v_in
+	axpby(N_, -dux, u_, 1.0, vtemp1);   // vtemp = v_out - dux*u
+      
+	// v_temp2 = tensorapply(K,vtemp1) + 
+	//   theta*tensorapply(C,vtemp1) + 
+	//   theta*theta*tensorapply(M,vtemp1) 
+	Kop_.apply(vtemp1, v_out);
+        vec_update(N_, 1.0, v_out, vtemp2);
+	
+	Cop_.apply(vtemp1, v_out);    // Problem!
+	axpby(N_, theta_, v_out, 1.0, vtemp2);
+
+	Mop_.apply(vtemp1, v_out);
+	axpby(N_, theta_*theta_, v_out, 1.0, vtemp2);
+
+	duy = complex_dot(N_, u_, vtemp2);        // duy = u'*v_out
+	duw = complex_dot(N_, u_, w_);            // duw = u'*w
+        axpby(N_, -duy/duw, w_, 1.0, vtemp2);     // vtemp2 = vtemp2 - (duy/duw)*w
+
+        vec_update(N_, 1.0, vtemp2, v_out);
+    
+	/*
+        for (int i=0; i<size; i++)
+        {if (rank==i){
+           std::cout<<"------rank "<<rank << "--------"<<std::endl;
+           for (int i=0;i<N_;i++)std::cout<<v_out[i]<<std::endl;
+           std::cout<<"----------------------------------"<<std::endl;
+        }}*/
+
+	free(vtemp1); free(vtemp2);
+	return;
+      }
+
+    private:
+      QRes::Kron2D<ST> Kop_;
+      QRes::Kron2D<ST> Cop_;
+      QRes::Kron2D<ST> Mop_;
+      ST* u_;
+      ST* w_;
+      ST theta_;
+  };
+
+
 }
 
 
