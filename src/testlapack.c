@@ -1,9 +1,25 @@
 /* Calling DGELS using row-major order */
 #include <stdio.h>
+
 #include "lapacke.h"
+#include "cblas.h"
+
 #include <complex.h>
 
-lapack_int test_ztrsyl();
+int main()
+{
+        const int dim=2;
+        double a[4]={1.0,1.0,1.0,1.0},b[4]={2.0,2.0,2.0,2.0},c[4];
+        int m=dim,n=dim,k=dim,lda=dim,ldb=dim,ldc=dim;
+        double al=1.0,be=0.0;
+        cblas_dgemm(101,111,111,m,n,k,al,a,lda,b,ldb,be,c,ldc);
+        printf("the matrix c is:%f,%f\n%f,%f\n",c[0],c[1],c[2],c[3]);
+        return 0;
+}
+
+
+
+//lapack_int test_ztrsyl();
 //lapack_int test_dhseqr();
 
 /*lapack_int test_dhseqr()
@@ -11,7 +27,7 @@ lapack_int test_ztrsyl();
    lapack_int n, ilo, ihi, ldh, ldz;
    
 }*/
-
+/*
 lapack_int test_ztrsyl()
 {
 
@@ -40,7 +56,7 @@ lapack_int test_ztrsyl()
      	    printf("%f " , c[i*n+j]);		
    	printf("\n");}
 
-   /*double ele;
+   double ele;
    for(int i=0;i<m;i++)
    {	   
       for(int j=0;j<n;j++)
@@ -58,7 +74,7 @@ lapack_int test_ztrsyl()
 	 printf("%f ,", ele);
       }
       printf("\n");
-   }*/
+   }
    
    return info;
 }
@@ -92,14 +108,14 @@ int main (int argc, const char * argv[])
    test_ztrsyl();
    
    // second try of LAPACK
-   /* lapack_int LAPACKE_dgges( int matrix_order, char jobvsl, char jobvsr, char sort, 
+    lapack_int LAPACKE_dgges( int matrix_order, char jobvsl, char jobvsr, char sort, 
     *                          LAPACK_D_SELECT3 select, lapack_int n, double* a, lapack_int lda, 
     *                          double* b, lapack_int ldb, lapack_int* sdim, double* alphar, 
     *                          double* alphai, double* beta, double* vsl, lapack_int ldvsl, 
     *                          double* vsr, lapack_int ldvsr );
-    */
+    
    
-  /* LAPACK_D_SELECT3 select;
+   LAPACK_D_SELECT3 select;
 
    double A[4][4] = {1.0, 4.1, 0.9, 1.4,
 	             6.8,-0.4,-3.8, 6.5,
@@ -128,10 +144,10 @@ int main (int argc, const char * argv[])
 	 printf("%lf ", A[i][j]); 
       }
       printf("\n");
-   }*/
+   }
 
    return 0;
 }
 
-   
+*/
 
