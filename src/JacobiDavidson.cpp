@@ -1,6 +1,7 @@
 #include "mpi.h"
 #include "header.hpp"
 #include "tensor3b1d.hpp"
+#include "tensor3b1d_blas.hpp"
 #include "operations.hpp"
 #include "gmres_solver.hpp"
 
